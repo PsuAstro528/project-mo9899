@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.16.0
+# v0.16.1
 
 using Markdown
 using InteractiveUtils
@@ -69,7 +69,7 @@ md"""
 """
 
 # ╔═╡ c9a3550e-ab84-44d4-a935-64e80ed51d63
-pix_plt = 4000:4400   # Pick some small range of wavelengths for testing
+pix_plt = 3500:4500   # Pick some small range of wavelengths for testing
 
 # ╔═╡ 8d935f79-f2da-4d41-8dad-85cd08197d17
 md"## Fit one line (for testing purposes)"
@@ -80,7 +80,7 @@ md"## Fit a few absorption lines"
 # ╔═╡ 26c1319c-8f39-42d8-a3b7-588ac90054d6
 begin
 	#λ_lines = [4575.107,4575.542,4575.788, 4576.337,4577.178, 4577.484, 4577.696,4578.032,4578.325]
-	λ_lines = [ 4575.5,4576.0,4577.1, 4576.35, 4576.8, 4577.6, 4578.4]
+	λ_lines = [ 4570.0, 4570.8, 4572.4, 4572.6, 4572.8, 4573.0, 4573.2, 4573.5, 4574.1, 4575.5, 4576.0, 4577.1, 4576.35, 4576.8, 4577.6, 4578.4, 4579.8 ]
 	σ_lines = fill(0.04,length(λ_lines))
 end;
 
@@ -155,21 +155,6 @@ begin  # Refit to pixels chosen to not be obviously in lines
 	blaze_model1 =  fit_blaze_model( (1:length(λ)), flux, var,  order=8, mask=pix_fit[pix_gt_100p_it1])
 end
 
-# ╔═╡ 4e568854-a031-43b8-a2fc-ea5f6da0b89f
-# Build dataframe of pixels for ploting (and eventually fitting spectral lines to) in window selected by pix_plt
-df = DataFrame( λ=view(λ,pix_plt), 
-				flux=view(flux,pix_plt)./blaze_model1.(pix_plt),
-				var =view(var,pix_plt)./(blaze_model1.(pix_plt)).^2
-				)
-
-# ╔═╡ 92fbbef4-7df3-4f6c-adda-3f8737429f61
-begin  # Make workspaces
-	dm_tmp = zeros(length(df.λ),1+length(λ_lines)*4)
-	covar_tmp = PDiagMat(df.var)
-	denom_tmp = zeros(1+length(λ_lines)*4,1+length(λ_lines)*4)
-	num_tmp = zeros(1+length(λ_lines)*4)
-end
-
 # ╔═╡ 7cb4a165-89a2-4020-b74d-ab01ed308965
 begin  # Refit to pixels chosen to not be obviously in lines
 	pix_gt_100p_it2 = flux[pix_fit]./blaze_model1.(pix_fit) .>= 1.0
@@ -195,6 +180,21 @@ begin
 	plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model2.(pix_fit), label="Observation/Blaze 2", color=:blue)
 	xlabel!("λ (Å)")
 	ylabel!("Normalized Flux")
+end
+
+# ╔═╡ 4e568854-a031-43b8-a2fc-ea5f6da0b89f
+# Build dataframe of pixels for ploting (and eventually fitting spectral lines to) in window selected by pix_plt
+df = DataFrame( λ=view(λ,pix_plt), 
+				flux=view(flux,pix_plt)./blaze_model2.(pix_plt),
+				var =view(var,pix_plt)./(blaze_model2.(pix_plt)).^2
+				)
+
+# ╔═╡ 92fbbef4-7df3-4f6c-adda-3f8737429f61
+begin  # Make workspaces
+	dm_tmp = zeros(length(df.λ),1+length(λ_lines)*4)
+	covar_tmp = PDiagMat(df.var)
+	denom_tmp = zeros(1+length(λ_lines)*4,1+length(λ_lines)*4)
+	num_tmp = zeros(1+length(λ_lines)*4)
 end
 
 # ╔═╡ 9adb91d3-cffe-4226-b1db-ef100fcbee40
@@ -280,8 +280,10 @@ end
 # Try fitting one line at a time
 #line = fit_line_v0(4575.5,0.04,df.λ,df.flux,df.var)
 #line = fit_line_v0(4576.0,0.04,df.λ,df.flux,df.var)
-line = fit_line_v0(4577.6,0.04,df.λ,df.flux,df.var)
+#line = fit_line_v0(4577.6,0.04,df.λ,df.flux,df.var)
 #line = fit_line_v0(4578.46,0.04,df.λ,df.flux,df.var)
+line = fit_line_v0(4579.8,0.04,df.λ,df.flux,df.var)
+
 
 # ╔═╡ cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
 begin
