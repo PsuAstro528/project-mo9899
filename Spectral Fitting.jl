@@ -74,6 +74,20 @@ pix_plt = 3500:4500   # Pick some small range of wavelengths for testing
 # ╔═╡ 8d935f79-f2da-4d41-8dad-85cd08197d17
 md"## Fit one line (for testing purposes)"
 
+# ╔═╡ 8a2353da-068e-4297-8420-7a672ff2df1d
+function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
+	i_tor = -90
+	min_diff = (maximum(λ)-minimum(λ))
+	for i in eachindex(λ)
+		curr_diff = abs(λ[i] - num_to_find)
+		if curr_diff < min_diff
+			i_tor = i
+			min_diff = curr_diff
+		end
+	end
+	return i_tor
+end
+
 # ╔═╡ 37309807-cd50-4196-a283-473ee937346a
 md"## Fit a few absorption lines"
 
@@ -271,12 +285,21 @@ function fit_line_v0(λ_line::Number, σ_line::Number, λ::V1, flux::V2, var::V3
 	
 	#finding the sum of residuals from λ-3σ to λ+3σ
 	#need to find the index i_1 in λ where λ[i_1] = λ_line, index i_0 in λ where λ[i_0] = λ_line-3σ, and index i_2 in λ where λ[i_2] = λ_line+3σ
+	i_0 = closest_index(λ, λ_line-3*σ_line)
+	i_1 = closest_index(λ, λ_line)
+	i_2 = closest_index(λ, λ_line+3*σ_line)
+	
+	loss = 0.0
+	for i = i_0:i_2
+		loss+=abs(flux[i]-line.(λ[i]))
+	end
 	
 	
-	return line
+	return line, loss
 end
 
 # ╔═╡ a17f0654-0038-4320-85ca-65221ada0e23
+<<<<<<< HEAD
 # Try fitting one line at a time
 #line = fit_line_v0(4575.5,0.04,df.λ,df.flux,df.var)
 #line = fit_line_v0(4576.0,0.04,df.λ,df.flux,df.var)
@@ -284,21 +307,26 @@ end
 #line = fit_line_v0(4578.46,0.04,df.λ,df.flux,df.var)
 line = fit_line_v0(4579.8,0.04,df.λ,df.flux,df.var)
 
+=======
+begin
+	# Try fitting one line at a time
+	#line = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[1]
+	#loss = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[2]
+	#line = fit_line_v0(4576.0,0.04,df.λ,df.flux,df.var)
+	line = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[1]
+	loss = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[2]
+	#line = fit_line_v0(4578.46,0.04,df.λ,df.flux,df.var)
+end
+>>>>>>> 6caa61e5b7b6341252c2e045aeaa302af5fa5265
 
 # ╔═╡ cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
 begin
 	local plt = plot(legend=:bottomright)
 	plot!(plt,df.λ,df.flux, label="Observation/Blaze")
 	plot!(plt,df.λ,line.(df.λ),label="Model")
+	#vline!([4577.6-3*0.04, 4577.6+3*0.04])
 	xlabel!("λ (Å)")
 	ylabel!("Normalized Flux")
-end
-
-# ╔═╡ a40ffdf7-b2e6-42ee-b4ec-e430fdaed23a
-begin
-	with_terminal() do
-		println(line)
-	end
 end
 
 # ╔═╡ f5d6e755-140a-44fa-9b9f-6e73227ee9cb
@@ -437,6 +465,9 @@ end
 
 # ╔═╡ a0cdca55-c6db-4f9e-90a3-89704637f62b
 l_test = AbsorptionLine(4577.6,0.04,(@SVector [1.0,0.5,0.3,0.2]) )
+
+# ╔═╡ 3f89b765-df41-4318-9873-41a0972f25b1
+
 
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
@@ -1576,10 +1607,10 @@ version = "0.9.1+5"
 # ╠═c9a3550e-ab84-44d4-a935-64e80ed51d63
 # ╠═4e568854-a031-43b8-a2fc-ea5f6da0b89f
 # ╟─8d935f79-f2da-4d41-8dad-85cd08197d17
+# ╠═8a2353da-068e-4297-8420-7a672ff2df1d
 # ╠═8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
 # ╠═a17f0654-0038-4320-85ca-65221ada0e23
 # ╠═cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
-# ╠═a40ffdf7-b2e6-42ee-b4ec-e430fdaed23a
 # ╟─37309807-cd50-4196-a283-473ee937346a
 # ╠═26c1319c-8f39-42d8-a3b7-588ac90054d6
 # ╠═d09a3103-c466-4eb7-8745-7cd1366d6beb
@@ -1609,6 +1640,7 @@ version = "0.9.1+5"
 # ╠═9b3c542e-579b-4f66-8518-4e234cd7c0e7
 # ╠═17626bf6-08db-413c-9930-28b43b4c1ad9
 # ╠═a0cdca55-c6db-4f9e-90a3-89704637f62b
+# ╠═3f89b765-df41-4318-9873-41a0972f25b1
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═10393148-b9b0-44a0-9b47-c6780318316b
