@@ -160,18 +160,25 @@ md"""
 
 # ╔═╡ d364758b-7ddb-4291-a844-b144a49acc0e
 md"""
-### Next Steps
+# Future Works
+
+## Next Steps
 * Find a way to automatically find a good fit σ for each line
 * Use values of the Gauss-Hermite Coefficients to characterize each line
 """
 
 # ╔═╡ 914f9545-adc1-4d9e-8260-dd75834328f0
 md"""
-##### Finding a better fit σ
+#### Finding a better fit σ
 ###### For the 17 known solar lines we fit above, we fine tune a σ that captures the shape of the absorption line dip by eye. The next step would be to find a σ for any given dip from the observed data automatically through Julia. All σs are approximately equal to 0.04.
 
-##### Gauss-Hermite Coefficients
+#### Gauss-Hermite Coefficients
 ###### Each of the four Gauss-Hermite Coefficients that are found for each absorption line fit represents some information about the shape of the line. For example, the first coeffient represents the depth of the line, the second coefficient represents the asymmetry of the line and so forth. The next step is to use the four coefficients found by the Gauss-Hermite fit to characterize each line, and then to find broadening patterns that could be due to doppler broadening or pressure broadening and so on.
+"""
+
+# ╔═╡ 5f14a35b-63aa-4a31-ab2d-38d84f005e67
+md"""
+##### The following are for testing and benchmarking, which we have not fully implemented yet. 
 """
 
 # ╔═╡ ec7f2e98-b0c8-40ed-a8b1-7d50bbd84503
@@ -262,6 +269,12 @@ df = DataFrame( λ=view(λ,pix_plt),
 				flux=view(flux,pix_plt)./blaze_model2.(pix_plt),
 				var =view(var,pix_plt)./(blaze_model2.(pix_plt)).^2
 				)
+
+# ╔═╡ 9adb91d3-cffe-4226-b1db-ef100fcbee40
+with_terminal() do
+	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
+	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
+end
 
 # ╔═╡ 890f0d73-3fa4-4ea6-a00a-c3672e8d0fa2
 md"""
@@ -371,6 +384,9 @@ begin
 	xlabel!("λ (Å)")
 	ylabel!("Normalized Flux")
 end
+
+# ╔═╡ a0cdca55-c6db-4f9e-90a3-89704637f62b
+l_test = AbsorptionLine(4577.6,0.04,(@SVector [1.0,0.5,0.3,0.2]) )
 
 # ╔═╡ f5d6e755-140a-44fa-9b9f-6e73227ee9cb
 begin
@@ -523,17 +539,8 @@ with_terminal() do
 	end
 end
 
-# ╔═╡ a0cdca55-c6db-4f9e-90a3-89704637f62b
-l_test = AbsorptionLine(4577.6,0.04,(@SVector [1.0,0.5,0.3,0.2]) )
-
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
-
-# ╔═╡ 9adb91d3-cffe-4226-b1db-ef100fcbee40
-with_terminal() do
-	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
-	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
-end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1646,8 +1653,11 @@ version = "0.9.1+5"
 # ╠═fe77f6f5-6bd7-47d4-aa49-fa85b555f00e
 # ╠═71b6349d-f212-4cad-85b8-7d3847dc39cb
 # ╠═5252c6b1-d438-416c-a47c-3692be5a2935
-# ╠═d364758b-7ddb-4291-a844-b144a49acc0e
-# ╠═914f9545-adc1-4d9e-8260-dd75834328f0
+# ╟─d364758b-7ddb-4291-a844-b144a49acc0e
+# ╟─914f9545-adc1-4d9e-8260-dd75834328f0
+# ╠═5f14a35b-63aa-4a31-ab2d-38d84f005e67
+# ╠═9adb91d3-cffe-4226-b1db-ef100fcbee40
+# ╠═a0cdca55-c6db-4f9e-90a3-89704637f62b
 # ╟─ec7f2e98-b0c8-40ed-a8b1-7d50bbd84503
 # ╟─fe94411c-4e48-47dc-a358-50a33190cd98
 # ╠═f5d6e755-140a-44fa-9b9f-6e73227ee9cb
@@ -1657,7 +1667,6 @@ version = "0.9.1+5"
 # ╠═8ab5e521-395b-4539-9617-67a8b64011af
 # ╟─890f0d73-3fa4-4ea6-a00a-c3672e8d0fa2
 # ╠═9b3c542e-579b-4f66-8518-4e234cd7c0e7
-# ╠═a0cdca55-c6db-4f9e-90a3-89704637f62b
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═10393148-b9b0-44a0-9b47-c6780318316b
@@ -1668,6 +1677,5 @@ version = "0.9.1+5"
 # ╠═83cd8a9e-7bdc-4834-b910-8068767ebfac
 # ╠═e533ddde-2ed7-42b3-a1cd-a1e5738cf3b3
 # ╠═ce588b8c-4656-4b58-b4e1-9c0ae8b9eefd
-# ╠═9adb91d3-cffe-4226-b1db-ef100fcbee40
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
