@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.16.1
+# v0.16.0
 
 using Markdown
 using InteractiveUtils
@@ -299,15 +299,6 @@ function fit_line_v0(λ_line::Number, σ_line::Number, λ::V1, flux::V2, var::V3
 end
 
 # ╔═╡ a17f0654-0038-4320-85ca-65221ada0e23
-<<<<<<< HEAD
-# Try fitting one line at a time
-#line = fit_line_v0(4575.5,0.04,df.λ,df.flux,df.var)
-#line = fit_line_v0(4576.0,0.04,df.λ,df.flux,df.var)
-#line = fit_line_v0(4577.6,0.04,df.λ,df.flux,df.var)
-#line = fit_line_v0(4578.46,0.04,df.λ,df.flux,df.var)
-line = fit_line_v0(4579.8,0.04,df.λ,df.flux,df.var)
-
-=======
 begin
 	# Try fitting one line at a time
 	#line = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[1]
@@ -317,14 +308,13 @@ begin
 	loss = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[2]
 	#line = fit_line_v0(4578.46,0.04,df.λ,df.flux,df.var)
 end
->>>>>>> 6caa61e5b7b6341252c2e045aeaa302af5fa5265
 
 # ╔═╡ cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
 begin
 	local plt = plot(legend=:bottomright)
 	plot!(plt,df.λ,df.flux, label="Observation/Blaze")
 	plot!(plt,df.λ,line.(df.λ),label="Model")
-	#vline!([4577.6-3*0.04, 4577.6+3*0.04])
+	vline!([4577.62-3*0.04, 4577.62+3*0.04])
 	xlabel!("λ (Å)")
 	ylabel!("Normalized Flux")
 end
@@ -368,11 +358,29 @@ function fit_lines_v0(λ_lines::V1, σ_lines::V2, λ::V3, flux::V4, var::V5, T::
 	coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
 	
 	lines = map(i->AbsorptionLine(λ_lines[i],σ_lines[i], coeff_hat[(2+(i-1)*order):(1+i*order)]), 1:n_lines)
-	return SpectrumModel(coeff_hat[1],lines)
+	
+	losses = zeros(n_lines)
+	for j in 1:n_lines
+		
+		this_line = lines[j]
+		
+		λ_line = λ_lines[j]
+		σ_line = σ_lines[j]
+		i_0 = closest_index(λ, λ_line-3*σ_line)
+		i_2 = closest_index(λ, λ_line+3*σ_line)
+		
+		loss = 0.0
+		for i = i_0:i_2
+			loss+=abs(flux[i]-this_line.(λ[i]))
+		end
+		losses[j] = loss
+	end
+	
+	return SpectrumModel(coeff_hat[1],lines), losses
 end
 
 # ╔═╡ fc6657f6-adf0-4786-8b00-a436e4aa0afe
-result0 = fit_lines_v0(λ_lines,σ_lines,df.λ,df.flux,df.var)
+result0 = fit_lines_v0(λ_lines,σ_lines,df.λ,df.flux,df.var)[1]
 
 # ╔═╡ d35fc6f2-ed06-4b30-bcce-f40d2199c650
 with_terminal() do 
@@ -438,9 +446,28 @@ end
 
 # ╔═╡ 27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
 begin
+	
+	A = fill(0.0,2*length(σ_lines))
+	
+	
+	N = length(σ_lines)
+	for i in 1:N
+		with_terminal() do
+			println(A[i])
+		end
+		σ_h = σ_lines[i]
+		A[2*(i)-1] = λ_lines[i]-3*σ_h
+		A[2*(i)] = λ_lines[i]+3*σ_h
+	end
+	
+	
 	local plt = plot(legend=:bottomright)
+	
 	plot!(plt,df.λ,df.flux, label="Observation/Fit")
 	plot!(plt,df.λ,result(df.λ),label="Model")
+	vline!(A)
+	
+	
 	xlabel!("λ (Å)")
 	ylabel!("Normalized Flux")
 end
