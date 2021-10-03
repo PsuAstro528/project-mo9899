@@ -4,7 +4,8 @@
 ### Goals:
 * Create models for known solar absorption lines utilizing Gauss-Hermite polynomials
 * Evaluate common shifts in absorption lines and determine what type of broadening or shift is at work utilizing the coefficients found of the Gauss-Hermite Polynomials
-* The first order G-H coefficient finds the depth of the line, the second order coefficient finds the asymmetry of the line, the third order finds the broadening of the line, and so on. This code will find all such coefficients to order N.
+** The first order G-H coefficient finds the depth of the line, the second order coefficient finds the asymmetry of the line, the third order finds the broadening of the line, and so on. This code will find all such coefficients to order N.
+** (So far the code has found G-H polynomials, but has not interpreted them yet)
 
 ### Structure of the Code:
 * Read in a fits file of data obtained from [here](https://neid.ipac.caltech.edu/search_solar.php)
