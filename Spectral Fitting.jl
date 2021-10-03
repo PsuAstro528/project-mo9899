@@ -63,6 +63,13 @@ begin    # Read in data and exclude any pixels that have issues
 	mask_fit = pix_fit[findall(.!(isnan.(λ[pix_fit]) .| isnan.(flux[pix_fit]) .| isnan.(var[pix_fit]) ))]
 end
 
+# ╔═╡ 7ce749a5-226a-4207-8984-9b2fad7560ff
+#making sure the data is read in correctly--all lambdas have a corresponding flux and variance
+begin
+	@test length(λ) > 0
+	@test length(flux) == length(λ) == length(var)
+end
+
 # ╔═╡ 1d610ca0-6981-48ff-b9d8-76c45807b5e7
 md"""
 ## Fit a model to blaze function
@@ -70,7 +77,7 @@ md"""
 
 # ╔═╡ 9b91c66f-efa9-4bb5-b0fd-3ebf20a50316
 md"""
-##### When light passes through a diffraction grating, it takes the shape of a Blaze function, so the observations follow a blaze shape. We remove the Blaze background here. 
+##### When light passes through a diffraction grating, it takes the shape of a Blaze function, so the observations follow a Blaze shape. We remove the Blaze background here. 
 """
 
 # ╔═╡ cf0842fc-f1b1-416f-be46-c9bc4ceae2be
@@ -80,15 +87,15 @@ md"""
 
 # ╔═╡ 9909c5fb-3e04-4ecf-9399-ccbdf665d35c
 md"""
-##### Picking a small range, where there are just enough lines that can be fitted in serial. The range is λ = 4569.94 angstroms to λ = 4579.8 angstroms. This data is held in a dataframe df.
+##### Picking a small range, where there are just enough lines that can be fitted in series (instead of parallel). The range is λ = 4569.94 angstroms to λ = 4579.8 angstroms. This data is held in a dataframe df.
 """
-
-# ╔═╡ 8d935f79-f2da-4d41-8dad-85cd08197d17
-md"## Fit one line (for testing purposes)"
 
 # ╔═╡ 8a2353da-068e-4297-8420-7a672ff2df1d
 function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
-	i_tor = -90
+	#this function finds the index in the array λ of the value that is closest to num_to_find
+	max_val = maximum(λ)
+	min_val = minimum(λ)
+	i_tor = 1
 	min_diff = (maximum(λ)-minimum(λ))
 	for i in eachindex(λ)
 		curr_diff = abs(λ[i] - num_to_find)
@@ -97,11 +104,16 @@ function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:Abstr
 			min_diff = curr_diff
 		end
 	end
+	@assert i_tor >= 0
+	@assert i_tor <= length(λ)
 	return i_tor
 end
 
 # ╔═╡ c9a3550e-ab84-44d4-a935-64e80ed51d63
-pix_plt = closest_index(λ, 4569.94):closest_index(λ, 4579.8)
+pix_plt = closest_index(λ, 4569.94):closest_index(λ, 4579.8) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun.
+
+# ╔═╡ 8d935f79-f2da-4d41-8dad-85cd08197d17
+md"## Fit one line (for testing purposes)"
 
 # ╔═╡ 37309807-cd50-4196-a283-473ee937346a
 md"## Fit to Real Solar Absorption Lines"
@@ -131,6 +143,17 @@ md"""
 md"""
 ### Printing out Gauss-Hermite coefficients
 """
+
+# ╔═╡ c4d4523b-e73d-479f-a169-6e40b1f09683
+md"""
+##### Running tests on the found Gauss-Hermite Coefficients
+"""
+
+# ╔═╡ 59aad668-6622-4af9-86c6-0e8f36ef03f7
+@test num_lines_found == length(λ_lines) #make sure all lines have been fitted to
+
+# ╔═╡ fe77f6f5-6bd7-47d4-aa49-fa85b555f00e
+@test num_gh_coeff == 4 #make sure all 4 orders exist
 
 # ╔═╡ d364758b-7ddb-4291-a844-b144a49acc0e
 md"""
@@ -393,6 +416,8 @@ function fit_lines_v0(λ_lines::V1, σ_lines::V2, λ::V3, flux::V4, var::V5, T::
 		i_0 = closest_index(λ, λ_line-3*σ_line)
 		i_2 = closest_index(λ, λ_line+3*σ_line)
 		
+		
+		
 		loss = 0.0
 		for i = i_0:i_2
 			loss+=abs(flux[i]-this_line.(λ[i]))
@@ -439,6 +464,7 @@ end
 losses0
 
 # ╔═╡ 164aad2d-f4aa-4b29-8fbb-e5ab6758492b
+#finding Gauss-Hermite Coefficients
 begin
 	lines_found = result0.lines
 	num_lines_found = length(lines_found)
@@ -452,6 +478,18 @@ begin
 			gh_s[i,j] = gh[j]
 		end
 	end
+end
+
+# ╔═╡ 71b6349d-f212-4cad-85b8-7d3847dc39cb
+#checking if all lines have exactly the same number of gh_coefficients
+begin
+	all_same_size = 1 #1 as in true, if false, it will be 0
+	for i in 1:length(lines_found)
+		if (length(lines_found[i].gh_coeff) != num_gh_coeff)
+			all_same_size = 0
+		end
+	end
+	@test all_same_size == 1
 end
 
 # ╔═╡ 5252c6b1-d438-416c-a47c-3692be5a2935
@@ -1542,19 +1580,20 @@ version = "0.9.1+5"
 # ╠═79f795c4-a1a6-4e08-a3f1-3bd7bca450ba
 # ╠═0a132ecb-c759-4448-823a-9c4727ee6916
 # ╠═1870ae31-79bb-4e5d-a7f1-6202cca94867
+# ╠═7ce749a5-226a-4207-8984-9b2fad7560ff
 # ╟─1d610ca0-6981-48ff-b9d8-76c45807b5e7
 # ╟─9b91c66f-efa9-4bb5-b0fd-3ebf20a50316
 # ╟─d25d1008-fd70-4fdb-8adf-8710cc938eb0
 # ╟─1baecae4-72cd-43fb-9b27-c619133eb915
-# ╟─984b85cd-e109-4a00-8c6a-c0efa7dcf35e
-# ╟─7cb4a165-89a2-4020-b74d-ab01ed308965
+# ╠═984b85cd-e109-4a00-8c6a-c0efa7dcf35e
+# ╠═7cb4a165-89a2-4020-b74d-ab01ed308965
 # ╟─cf0842fc-f1b1-416f-be46-c9bc4ceae2be
 # ╟─c28ee2aa-d3ee-4688-b9a2-cb6b04f31de8
 # ╟─9909c5fb-3e04-4ecf-9399-ccbdf665d35c
 # ╠═c9a3550e-ab84-44d4-a935-64e80ed51d63
 # ╠═4e568854-a031-43b8-a2fc-ea5f6da0b89f
-# ╟─8d935f79-f2da-4d41-8dad-85cd08197d17
 # ╠═8a2353da-068e-4297-8420-7a672ff2df1d
+# ╟─8d935f79-f2da-4d41-8dad-85cd08197d17
 # ╠═8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
 # ╠═a17f0654-0038-4320-85ca-65221ada0e23
 # ╠═cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
@@ -1568,7 +1607,11 @@ version = "0.9.1+5"
 # ╟─833904d3-02c1-44c1-b890-219729e9045c
 # ╠═7913a2aa-6829-4de1-933e-2cb083701b6d
 # ╟─4071e48b-7911-4d90-94d3-746cb9b667ef
-# ╟─164aad2d-f4aa-4b29-8fbb-e5ab6758492b
+# ╠═164aad2d-f4aa-4b29-8fbb-e5ab6758492b
+# ╟─c4d4523b-e73d-479f-a169-6e40b1f09683
+# ╠═59aad668-6622-4af9-86c6-0e8f36ef03f7
+# ╠═fe77f6f5-6bd7-47d4-aa49-fa85b555f00e
+# ╠═71b6349d-f212-4cad-85b8-7d3847dc39cb
 # ╠═5252c6b1-d438-416c-a47c-3692be5a2935
 # ╟─d364758b-7ddb-4291-a844-b144a49acc0e
 # ╠═914f9545-adc1-4d9e-8260-dd75834328f0
