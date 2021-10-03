@@ -7,7 +7,8 @@
 * The first order G-H coefficient finds the depth of the line, the second order coefficient finds the asymmetry of the line, the third order finds the broadening of the line, and so on. This code will find all such coefficients to order N.
 
 ### Structure of the Code:
-* Read in a fits file of data obtained from [here](https://neid.ipac.caltech.edu/search_solar.php)-tested that there is data with matching length values
+* Read in a fits file of data obtained from [here](https://neid.ipac.caltech.edu/search_solar.php)
+* Tested that data exists with matching length values
 * Exclude certain pixels near the edge of the detector from the dataset, where the observations are distorted or unreliable
 * Remove blaze function background from the observed data, since we are dealing with diffraction data which follows a blaze pattern
 * Divide our observation by our blaze function to view the continuum and all the absorption features
