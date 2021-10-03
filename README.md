@@ -23,9 +23,13 @@
 * Tested that we found the expected number of Gauss-Hermite coefficients
 
 ### Next Steps:
-* Write a function that calculates standard deviation for each line model
+* Find some way to automatically estimate a good standard deviation for each line model
 * Use the Hermite coefficients to examine the shifts in solar data and attribute to physical processes on the sun
 
+### For Reviewers
+* The heavy-lifting of the code happens in the functions where lines are fitted (fit_line_v0 and fit_lines_v0). Specifically, we imagine any optimization would need to happen where loss is calculated
+* For each fit, we calculate the loss function by finding the sum of the difference between predicted flux from observed flux over the wavelength region \lambda-3\sigma to \lambda-3\sigma. 
+	* Thus, our loss function is very sensitive to having the correct (or reasonably correct) \sigma value. Any suggestions of how to automatically find a \sigma through julia would be very welcome.
 
 [![Open in Visual Studio Code](https://classroom.github.com/assets/open-in-vscode-f059dc9a6f8d3a56e377f745f24479a46679e63a5d9fe6f495e02850cd0d8118.svg)](https://classroom.github.com/online_ide?assignment_repo_id=5589173&assignment_repo_type=AssignmentRepo)
 # Astro 528 [Class Project](https://psuastro528.github.io/project/)

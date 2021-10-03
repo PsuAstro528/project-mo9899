@@ -41,7 +41,7 @@ md"## Read input data"
 
 # ╔═╡ e624fdcd-df68-4cb7-811a-80154f624a47
 begin
-	data_path = ""  # Replace with path to where you store data
+	data_path = ""  #Data is stored in same directory as this file
 	filename = "neidL1_20210305T170410.fits"   # Just one example
 end
 
@@ -95,7 +95,7 @@ function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:Abstr
 	#this function finds the index in the array λ of the value that is closest to num_to_find
 	max_val = maximum(λ)
 	min_val = minimum(λ)
-	i_tor = 1
+	i_tor = 1 #"tor" as in "to return"
 	min_diff = (max_val-min_val)
 	for i in eachindex(λ)
 		curr_diff = abs(λ[i] - num_to_find)
@@ -104,8 +104,8 @@ function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:Abstr
 			min_diff = curr_diff
 		end
 	end
-	@assert i_tor >= 0
-	@assert i_tor <= length(λ)
+	@assert i_tor >= 0 #make sure that the function isn't somehow magically returning a negative index
+	@assert i_tor <= length(λ) #make sure the function doesn't return an index that is larger than the arrya
 	return i_tor
 end
 
@@ -116,7 +116,7 @@ pix_plt = closest_index(λ, 4569.94):closest_index(λ, 4579.8) #finds the indice
 md"## Fit one line (for testing purposes)"
 
 # ╔═╡ 95351552-1468-4f22-83b1-1b089fdb5b33
-num_gh_orders = 4
+num_gh_orders = 4 #here we can set the order of GH polynomial fits for the rest of the code
 
 # ╔═╡ 37309807-cd50-4196-a283-473ee937346a
 md"## Fit to Real Solar Absorption Lines"
@@ -128,9 +128,15 @@ md"""
 
 # ╔═╡ 26c1319c-8f39-42d8-a3b7-588ac90054d6
 begin
+	#Found these absorption lines with these standard deviations for each line. 
 	λ_lines = [ 4570.05, 4570.85, 4572.35, 4572.7, 4572.95, 4573.25, 4573.56, 4574.15, 4575.5, 4576.02, 4577.07, 4576.4, 4576.8, 4577.63, 4578.45 ]
 	σ_lines = [0.04, 0.04, 0.04, 0.04, 0.03, 0.04, 0.03, 0.03, 0.04, 0.03, 0.03, 0.03, 0.04, 0.04, 0.03]
 end;
+
+# ╔═╡ 0af8099e-0efe-44d2-83e4-abe0d84a900a
+md"""
+###### The next test is making sure loss isn't ridiculously large for any of the fits (we assume "ridiculously large" is a loss larger than 15 or so). The assumption is that if the loss is so large, one of the fits is either very bad or there was some runtime error somewhere. Ostensibly, this is our regression test-it tests how good the regression has gone.
+"""
 
 # ╔═╡ 094e5734-ea75-45d7-b09d-0fe6c6e4c4b5
 md"""
@@ -225,17 +231,16 @@ begin  # Refit to pixels chosen to not be obviously in lines
 end
 
 # ╔═╡ 7cb4a165-89a2-4020-b74d-ab01ed308965
-begin  # Refit to pixels chosen to not be obviously in lines
+begin  # Removing Blaze background by dividing observations by blaze function
 	pix_gt_100p_it2 = flux[pix_fit]./blaze_model1.(pix_fit) .>= 1.0
 	blaze_model2 =  fit_blaze_model( (1:length(λ)), flux, var,  order=8, mask=pix_fit[pix_gt_100p_it2])
 end
 
 # ╔═╡ 1baecae4-72cd-43fb-9b27-c619133eb915
 begin
+	#plotting observation versus the modeled blaze function
 	local plt = plot()
 	plot!(plt,λ[pix_fit],flux[pix_fit], label="Observation",color=:grey)
-	#plot!(λ[pix_fit],blaze_model0.(pix_fit), label="Blaze 0",color=:red)
-	#plot!(λ[pix_fit],blaze_model1.(pix_fit), label="Blaze 1",color=:green)
 	plot!(λ[pix_fit],blaze_model2.(pix_fit), label="Blaze 2",color=:blue)
 	xlabel!("λ (Å)")
 	ylabel!("Flux")
@@ -311,7 +316,9 @@ end
 # ╔═╡ 8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
 function fit_line_v0(λ_line::Number, σ_line::Number, λ::V1, flux::V2, var::V3, T::Type = promote_type(T1,T2,T3); order::Integer=num_gh_orders ) where
 			{ T1<:Number, T2<:Number, T3<:Number,
-			  V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
+			  V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} }
+	
+	#This function fits to one absorption line only, finding the GH coefficients and the loss of that fit. Note that this takes in an estimate of σ, the standard deviation of the absorption line.
 	@assert size(λ) == size(flux) == size(var)
 	n = length(λ)
 	@assert n > 4  # Minimum for 4 parameter fit
@@ -330,6 +337,10 @@ function fit_line_v0(λ_line::Number, σ_line::Number, λ::V1, flux::V2, var::V3
 	i_1 = closest_index(λ, λ_line)
 	i_2 = closest_index(λ, λ_line+3*σ_line)
 	
+	@assert i_0 >= 0 and i_0 < i_1 and i_0 < i_2
+	@assert i_1 >= 0 and i_1 < i_2
+	@assert i_2 >= 0 and i_2 <= length(λ_line)
+	
 	loss = 0.0
 	for i = i_0:i_2
 		loss+=abs(flux[i]-line.(λ[i]))
@@ -341,17 +352,18 @@ end
 
 # ╔═╡ a17f0654-0038-4320-85ca-65221ada0e23
 begin
-	# Try fitting one line at a time
+	# Fitting to one line, and getting the loss
 	#line = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[1]
 	#loss = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[2]
-	#line = fit_line_v0(4576.0,0.04,df.λ,df.flux,df.var)
+	
 	line = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[1]
 	loss = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[2]
-	#line = fit_line_v0(4578.46,0.04,df.λ,df.flux,df.var)
+	
 end
 
 # ╔═╡ cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
 begin
+	#plotting observational data with fitted model and a 3-σ window, in green. The left green line is at λ - 3σ and the right green line is at λ + 3σ
 	local plt = plot(legend=:bottomright)
 	plot!(plt,df.λ,df.flux, label="Observation/Blaze")
 	plot!(plt,df.λ,line.(df.λ),label="Model")
@@ -380,6 +392,8 @@ end
 function fit_lines_v0(λ_lines::V1, σ_lines::V2, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T2,T3,T4,T5); order::Integer=num_gh_orders ) where
 			{ T1<:Number, T2<:Number, T3<:Number, T4<:Number, T5<:Number,
 			  V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
+	
+	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
 	@assert size(λ_lines) == size(σ_lines)
 	@assert size(λ) == size(flux) == size(var)
 	n_pix = length(λ)
@@ -421,7 +435,6 @@ function fit_lines_v0(λ_lines::V1, σ_lines::V2, λ::V3, flux::V4, var::V5, T::
 		end
 		losses[j] = loss
 	end
-	
 	return SpectrumModel(coeff_hat[1],lines), losses
 end
 
@@ -430,7 +443,14 @@ begin
 	fitted0 = fit_lines_v0(λ_lines,σ_lines,df.λ,df.flux,df.var)
 	result0 = fitted0[1]
 	losses0 = fitted0[2]
+	
 end
+
+# ╔═╡ 53975fd7-27e3-4b13-998c-24721dadd0bf
+@test length(losses0) == length(result0.lines) == length(λ_lines) #testing to make sure all the lines have been fitted to, and there is a loss for each fit
+
+# ╔═╡ 8c3b9f88-4a8b-4d4e-b451-dbf8e2cba69a
+@test maximum(losses0) < 15
 
 # ╔═╡ 27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
 begin
@@ -461,8 +481,9 @@ end
 losses0
 
 # ╔═╡ 164aad2d-f4aa-4b29-8fbb-e5ab6758492b
-#finding Gauss-Hermite Coefficients
+#reading Gauss-Hermite Coefficients from the fitted lines
 begin
+	
 	lines_found = result0.lines
 	num_lines_found = length(lines_found)
 	num_gh_coeff = length(lines_found[1].gh_coeff)
@@ -1591,7 +1612,7 @@ version = "0.9.1+5"
 # ╠═7ce749a5-226a-4207-8984-9b2fad7560ff
 # ╟─1d610ca0-6981-48ff-b9d8-76c45807b5e7
 # ╠═9b91c66f-efa9-4bb5-b0fd-3ebf20a50316
-# ╟─d25d1008-fd70-4fdb-8adf-8710cc938eb0
+# ╠═d25d1008-fd70-4fdb-8adf-8710cc938eb0
 # ╟─1baecae4-72cd-43fb-9b27-c619133eb915
 # ╠═984b85cd-e109-4a00-8c6a-c0efa7dcf35e
 # ╠═7cb4a165-89a2-4020-b74d-ab01ed308965
@@ -1611,6 +1632,9 @@ version = "0.9.1+5"
 # ╠═26c1319c-8f39-42d8-a3b7-588ac90054d6
 # ╠═d09a3103-c466-4eb7-8745-7cd1366d6beb
 # ╠═9a06230b-2c9d-43e9-ab7f-00d9b62c44d0
+# ╠═53975fd7-27e3-4b13-998c-24721dadd0bf
+# ╟─0af8099e-0efe-44d2-83e4-abe0d84a900a
+# ╠═8c3b9f88-4a8b-4d4e-b451-dbf8e2cba69a
 # ╟─094e5734-ea75-45d7-b09d-0fe6c6e4c4b5
 # ╟─27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
 # ╟─833904d3-02c1-44c1-b890-219729e9045c
