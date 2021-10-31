@@ -12,6 +12,12 @@ begin
 	using SpecialPolynomials
 end
 
+# ╔═╡ aed1a891-a5bb-469b-9771-43cb0945d214
+using Gumbo
+
+# ╔═╡ fecb4b5e-9046-4cf2-8b82-8f34b09dd662
+using ThreadsX
+
 # ╔═╡ 10393148-b9b0-44a0-9b47-c6780318316b
 using Statistics: mean
 
@@ -110,13 +116,22 @@ function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:Abstr
 end
 
 # ╔═╡ c9a3550e-ab84-44d4-a935-64e80ed51d63
-pix_plt = closest_index(λ, 4569.94):closest_index(λ, 4579.8) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun. When we move to parallelized code, we will look at all wavelengths, not just this smaller band.
+begin
+	pix_plt = closest_index(λ, 4569.94):closest_index(λ, 4579.8)
+	
+	
+	#pix_plt = closest_index(λ, 4560):closest_index(λ, 4606) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun. When we move to parallelized code, we will look at all wavelengths, not just this smaller band.
+	
+end
 
 # ╔═╡ 8d935f79-f2da-4d41-8dad-85cd08197d17
 md"## Fit one line (for testing purposes)"
 
 # ╔═╡ 95351552-1468-4f22-83b1-1b089fdb5b33
 num_gh_orders = 4 #here we can set the order of GH polynomial fits for the rest of the code
+
+# ╔═╡ 981f93cd-3b62-48ba-b161-61b9513c7aaf
+
 
 # ╔═╡ 37309807-cd50-4196-a283-473ee937346a
 md"## Fit to Real Solar Absorption Lines"
@@ -130,7 +145,14 @@ md"""
 begin
 	#Found these absorption lines with these standard deviations for each line. 
 	λ_lines = [ 4570.05, 4570.85, 4572.35, 4572.7, 4572.95, 4573.25, 4573.56, 4574.15, 4575.5, 4576.02, 4577.07, 4576.4, 4576.8, 4577.63, 4578.45 ]
-	σ_lines = [0.04, 0.04, 0.04, 0.04, 0.03, 0.04, 0.03, 0.03, 0.04, 0.03, 0.03, 0.03, 0.04, 0.04, 0.03]
+	#λ_lines = [4560.09044269, 4560.27185015, 4560.7138923, 4560.87058731, 4561.19565741, 4561.41477454, 4561.73350736, 4562.36570308, 4562.63219195, 4562.88721176, 4563.23989931, 4563.41910949, 4563.76449209, 4564.17151481, 4564.34024273, 4564.69744168, 4564.82724255, 4565.5196282, 4565.66471622, 4566.23229193, 4566.51949452, 4566.87124681, 4567.40957888, 4568.32947197, 4568.60675666, 4568.77955633, 4569.35589751, 4569.61424051, 4570.02161725, 4570.37846574, 4571.09895901, 4571.43706403, 4571.67596248, 4571.97850945, 4572.27601199, 4572.60413885, 4572.86475639, 4573.80826847, 4573.9777376, 4574.22058447, 4574.47278377, 4574.72227641, 4575.10790085, 4575.54216767, 4575.78807278, 4576.33735793, 4577.17797639, 4577.48371817, 4577.69571021, 4578.03225993, 4578.32482976, 4578.55743589, 4579.05844195, 4579.32999314, 4579.51175328, 4579.67461995, 4579.81960761, 4580.05636844, 4580.41671944, 4580.5881527, 4581.04111864, 4581.20192551, 4582.30743629, 4582.49483022, 4582.83395544, 4583.12727938, 4583.41373121, 4583.83832133, 4584.28107653, 4584.81731555, 4585.08049157, 4585.34095137, 4585.8742966, 4586.22544989, 4586.3712534, 4587.13181633, 4587.72177531, 4588.20292127, 4588.68796051, 4589.01082716, 4589.29840078, 4589.95113751, 4590.7903537, 4591.110535, 4591.39612609, 4592.05460424, 4592.36460681, 4592.65733244, 4593.17249527, 4593.52895394, 4593.92276107, 4594.11902026, 4594.41880008, 4594.63251674, 4594.89747512, 4595.36207176, 4595.59618168, 4596.0598587, 4596.41240259, 4596.57597596, 4596.90736432, 4597.24435651, 4597.38289242, 4597.75193956, 4597.86998627, 4598.12294754, 4598.37433123, 4598.74391477, 4598.99676453, 4599.22776442, 4599.84019949, 4600.10956905, 4600.36277084, 4600.75496545, 4600.98933507, 4602.00568367, 4602.94726271, 4603.34340716, 4603.94811757, 4604.2386484, 4604.55836275, 4604.99229269, 4605.36751583]
+
+	
+	#σ_lines = [0.04, 0.04, 0.04, 0.04, 0.03, 0.04, 0.03, 0.03, 0.04, 0.03, 0.03, 0.03, 0.04, 0.04, 0.03]
+	
+	
+	
+	#σ_lines = [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
 end;
 
 # ╔═╡ 0af8099e-0efe-44d2-83e4-abe0d84a900a
@@ -318,6 +340,7 @@ begin
 		T = typeof(line.λ)
 		gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials 
 		x = (λ.-line.λ)./line.σ
+		
 		g = exp.(-0.5.*x.^2) 
 		# Could eliminate some allocations in mapreduce with hcat.
 		p = mapreduce(i->line.gh_coeff[i].*gh_polys[i].(x),hcat,1:length(line.gh_coeff))
@@ -337,7 +360,8 @@ function fit_line_v0(λ_line::Number, σ_line::Number, λ::V1, flux::V2, var::V3
 	@assert n > 4  # Minimum for 4 parameter fit
 	covar = PDiagMat(var)   
 	line = AbsorptionLine(λ_line, σ_line, zeros(order) )
-	design_matrix = hcat(ones(n), gauss_hermite_basis(line,λ,orders=1:order)) 
+	design_matrix = hcat(ones(n), gauss_hermite_basis(line,λ,orders=1:order))
+	
 	# Generalized linear least squares
 	Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
 	X_inv_covar_y =   design_matrix' * (covar \ flux) 
@@ -368,6 +392,7 @@ begin
 	# Fitting to one line, and getting the loss
 	#line = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[1]
 	#loss = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[2]
+	
 	
 	line = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[1]
 	loss = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[2]
@@ -405,65 +430,77 @@ begin
 end
 
 # ╔═╡ d09a3103-c466-4eb7-8745-7cd1366d6beb
-function fit_lines_v0(λ_lines::V1, σ_lines::V2, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T2,T3,T4,T5); order::Integer=num_gh_orders ) where
-			{ T1<:Number, T2<:Number, T3<:Number, T4<:Number, T5<:Number,
-			  V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
+function fit_lines_v0(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer=num_gh_orders ) where
+			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
+			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 	
 	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
-	@assert size(λ_lines) == size(σ_lines)
+	
 	@assert size(λ) == size(flux) == size(var)
 	n_pix = length(λ)
 	n_lines = length(λ_lines)
+	n = length(λ)
 	@assert n_lines >= 1 
 	@assert 1 <= order <= length(gh_polynomials) 
 	@assert n_pix > 1 + order*n_lines  # number of fit parameters
 	covar = PDiagMat(var)   # diagonal covariance matrix
 	design_matrix = ones(n_pix,1)
-	for i in 1:n_lines
-		line = AbsorptionLine(λ_lines[i], σ_lines[i],(@SVector zeros(order)) ) #create a line data-structure 
-		design_matrix = hcat(  design_matrix,
-			gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
-	end
-	Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
-	X_inv_covar_y =   design_matrix' * (covar \ flux ) 
-	coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
 	
-	lines = map(i->AbsorptionLine(λ_lines[i],σ_lines[i], coeff_hat[(2+(i-1)*order):(1+i*order)]), 1:n_lines)
-	
-	#calculating loss function for each fitted line
-	#loss is the sum of the abs(predicted flux - actual flux) for all wavelengths from lambda_line-3*σ to lambda_line+3*σ
-	
-	losses = zeros(n_lines) 
-	for j in 1:n_lines
+	fitted_lines = []
+	fitted_losses = []
+	Threads.@threads for i in 1:n_lines
+		λ_line = λ_lines[i]
+		σ_line = 0.04
+		#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
+		lowest_idx = closest_index(λ, λ_line-0.25*σ_line)
+		highest_idx = closest_index(λ, λ_line+0.25*σ_line)
 		
-		this_line = lines[j]
-		
-		λ_line = λ_lines[j]
-		σ_line = σ_lines[j]
-		i_0 = closest_index(λ, λ_line-3*σ_line)
-		i_2 = closest_index(λ, λ_line+3*σ_line)
-		
-		
-		
-		loss = 0.0
-		for i = i_0:i_2
-			loss+=abs(flux[i]-this_line.(λ[i]))
+		losses = zeros(highest_idx-lowest_idx+1)
+		line_tries = []
+		Threads.@threads for j = lowest_idx:highest_idx
+			λ_to_fit = λ[j]
+
+			line = AbsorptionLine(λ_to_fit, σ_line,(@SVector zeros(order)) ) #create a line data-structure 
+			design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
+			Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
+			X_inv_covar_y =   design_matrix' * (covar \ flux ) 
+			coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
+			line = AbsorptionLine(λ_to_fit, σ_line, coeff_hat[2:end] )
+			
+			push!(line_tries, line)
+			#line_tries.append(line)
+			#calculating loss for this fit
+			lowest_loss_idx = closest_index(λ, λ_line-2.5*σ_line)
+			highest_loss_idx = closest_index(λ, λ_line+2.5*σ_line)
+			loss = 0.0
+			Threads.@threads for k = lowest_loss_idx:highest_loss_idx
+				loss+=abs(flux[k]-line.(λ[k]))
+			end
+			losses[j-lowest_idx+1] = loss
 		end
-		losses[j] = loss
+		
+		#find fit with lowest loss
+		best_fit_loss, best_fit_idx = findmin(losses)
+		best_fit_λ = λ[best_fit_idx]
+		best_fit_line = line_tries[best_fit_idx]
+		
+		push!(fitted_lines, best_fit_line)
+		push!(fitted_losses, best_fit_loss)
 	end
-	return SpectrumModel(coeff_hat[1],lines), losses
+	return SpectrumModel(1,fitted_lines), fitted_losses
+	
 end
 
 # ╔═╡ 9a06230b-2c9d-43e9-ab7f-00d9b62c44d0
 begin
-	fitted0 = fit_lines_v0(λ_lines,σ_lines,df.λ,df.flux,df.var)
-	result0 = fitted0[1]
+	fitted0 = fit_lines_v0(λ_lines,df.λ,df.flux,df.var)
+	fitted_lines = fitted0[1].lines
 	losses0 = fitted0[2]
 	
 end
 
 # ╔═╡ 53975fd7-27e3-4b13-998c-24721dadd0bf
-@test length(losses0) == length(result0.lines) == length(λ_lines) #testing to make sure all the lines have been fitted to, and there is a loss for each fit
+@test length(losses0) == length(fitted_lines) == length(λ_lines) #testing to make sure all the lines have been fitted to, and there is a loss for each fit
 
 # ╔═╡ 8c3b9f88-4a8b-4d4e-b451-dbf8e2cba69a
 @test maximum(losses0) < 15
@@ -471,22 +508,22 @@ end
 # ╔═╡ 27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
 begin
 	
-	A = fill(0.0,2*length(σ_lines))
+	A = fill(0.0,2*length(λ_lines))
 	
 	
-	N = length(σ_lines)
+	N = length(λ_lines)
 	for i in 1:N
-		σ_h = σ_lines[i]
-		A[2*(i)-1] = λ_lines[i]-3*σ_h
-		A[2*(i)] = λ_lines[i]+3*σ_h
+		σ_h = 0.04
+		A[2*(i)-1] = λ_lines[i]-1*σ_h
+		A[2*(i)] = λ_lines[i]+1*σ_h
 	end
 	
 	
 	local plt = plot(legend=:bottomright)
 	
 	plot!(plt,df.λ,df.flux, label="Observation/Fit")
-	plot!(plt,df.λ,result0(df.λ),label="Model")
-	vline!(A)
+	plot!(plt,df.λ,fitted0[1](df.λ),label="Model")
+	#vline!(A)
 	
 	
 	xlabel!("λ (Å)")
@@ -496,17 +533,20 @@ end
 # ╔═╡ 7913a2aa-6829-4de1-933e-2cb083701b6d
 losses0
 
+# ╔═╡ 6208b5ee-eca0-4905-93a9-182992bd3647
+fitted_lines
+
 # ╔═╡ 164aad2d-f4aa-4b29-8fbb-e5ab6758492b
 #reading Gauss-Hermite Coefficients from the fitted lines
 begin
 	
-	lines_found = result0.lines
-	num_lines_found = length(lines_found)
-	num_gh_coeff = length(lines_found[1].gh_coeff)
+	
+	num_lines_found = length(fitted_lines)
+	num_gh_coeff = length(fitted_lines[1].gh_coeff)
 	gh_s = reshape(zeros(num_lines_found*num_gh_coeff), num_lines_found, num_gh_coeff)
 	#gh_s = Array{Float64}(undef, length(lines_found), length(lines_found[1].gh_coeff))
-	for i in 1:length(lines_found)
-		gh = lines_found[i].gh_coeff
+	for i in 1:length(fitted_lines)
+		gh = fitted_lines[i].gh_coeff
 		for j in 1:length(gh)
 			
 			gh_s[i,j] = gh[j]
@@ -520,24 +560,27 @@ end
 # ╔═╡ fe77f6f5-6bd7-47d4-aa49-fa85b555f00e
 @test num_gh_coeff == num_gh_orders #make sure all orders exist
 
-# ╔═╡ 71b6349d-f212-4cad-85b8-7d3847dc39cb
-#checking if all lines have exactly the same number of gh_coefficients
-begin
-	all_same_size = 1 #1 as in true, if false, it will be 0
-	for i in 1:length(lines_found)
-		if (length(lines_found[i].gh_coeff) != num_gh_coeff)
-			all_same_size = 0
-		end
-	end
-	@test all_same_size == 1
-end
-
 # ╔═╡ 5252c6b1-d438-416c-a47c-3692be5a2935
 with_terminal() do
 	for k in 1:Int(length(gh_s)/num_gh_coeff)
 		println(gh_s[k, :])	
 	end
 end
+
+# ╔═╡ 71b6349d-f212-4cad-85b8-7d3847dc39cb
+#checking if all lines have exactly the same number of gh_coefficients
+begin
+	all_same_size = 1 #1 as in true, if false, it will be 0
+	for i in 1:length(fitted_lines)
+		if (length(fitted_lines[i].gh_coeff) != num_gh_coeff)
+			all_same_size = 0
+		end
+	end
+	@test all_same_size == 1
+end
+
+# ╔═╡ 6c1097c4-ac7d-42a7-8241-e185f25b44ab
+
 
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
@@ -548,6 +591,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
+Gumbo = "708ec375-b3d6-5a57-a7ce-8257bf98657a"
 LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
 PDMats = "90014a1f-27ba-587c-ab20-58faa44d9150"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -558,11 +602,13 @@ SpecialPolynomials = "a25cea48-d430-424a-8ee7-0d3ad3742e9e"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 
 [compat]
 DataFrames = "~1.2.2"
 FITSIO = "~0.16.9"
 FillArrays = "~0.12.6"
+Gumbo = "~0.8.0"
 LazyArrays = "~0.22.2"
 PDMats = "~0.11.1"
 Plots = "~1.22.3"
@@ -572,17 +618,28 @@ Polynomials = "~2.0.15"
 SpecialPolynomials = "~0.2.6"
 StaticArrays = "~1.2.13"
 StructArrays = "~0.6.3"
+ThreadsX = "~0.1.8"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
+[[AbstractTrees]]
+git-tree-sha1 = "03e0550477d86222521d254b741d470ba17ea0b5"
+uuid = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+version = "0.3.4"
+
 [[Adapt]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "84918055d15b3114ede17ac6a7182f68870c16f7"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 version = "3.3.1"
+
+[[ArgCheck]]
+git-tree-sha1 = "dedbbb2ddb876f899585c4ec4433265e3017215a"
+uuid = "dce04be8-c92d-5529-be00-80e4d2c0e197"
+version = "2.1.0"
 
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -596,8 +653,19 @@ version = "0.7.6"
 [[Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 
+[[BangBang]]
+deps = ["Compat", "ConstructionBase", "Future", "InitialValues", "LinearAlgebra", "Requires", "Setfield", "Tables", "ZygoteRules"]
+git-tree-sha1 = "0ad226aa72d8671f20d0316e03028f0ba1624307"
+uuid = "198e06fe-97b7-11e9-32a5-e1d131e6ad66"
+version = "0.3.32"
+
 [[Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+
+[[Baselet]]
+git-tree-sha1 = "aebf55e6d7795e02ca500a689d326ac979aaf89e"
+uuid = "9718e550-a3fa-408a-8086-8db961cd8217"
+version = "0.1.1"
 
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -663,6 +731,17 @@ version = "3.39.0"
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 
+[[CompositionsBase]]
+git-tree-sha1 = "455419f7e328a1a2493cabc6428d79e951349769"
+uuid = "a33af91c-f02d-484b-be07-31d278c5ca2b"
+version = "0.1.1"
+
+[[ConstructionBase]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "f74e9d5388b8620b4cee35d4c5a618dd4dc547f4"
+uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+version = "1.3.0"
+
 [[Contour]]
 deps = ["StaticArrays"]
 git-tree-sha1 = "9f02045d934dc030edad45944ea80dbd1f0ebea7"
@@ -699,6 +778,11 @@ version = "1.0.0"
 [[Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+[[DefineSingletons]]
+git-tree-sha1 = "77b4ca280084423b728662fe040e5ff8819347c5"
+uuid = "244e2a9f-e319-4986-a169-4d1fe445cd52"
+version = "0.1.1"
 
 [[DelimitedFiles]]
 deps = ["Mmap"]
@@ -807,9 +891,9 @@ uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
 [[GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
-git-tree-sha1 = "dba1e8614e98949abfa60480b13653813d8f0157"
+git-tree-sha1 = "0c603255764a1fa0b61752d2bec14cfbd18f7fe8"
 uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
-version = "3.3.5+0"
+version = "3.3.5+1"
 
 [[GR]]
 deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
@@ -852,6 +936,18 @@ git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
 uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
 
+[[Gumbo]]
+deps = ["AbstractTrees", "Gumbo_jll", "Libdl"]
+git-tree-sha1 = "e711d08d896018037d6ff0ad4ebe675ca67119d4"
+uuid = "708ec375-b3d6-5a57-a7ce-8257bf98657a"
+version = "0.8.0"
+
+[[Gumbo_jll]]
+deps = ["Libdl", "Pkg"]
+git-tree-sha1 = "86111f5523d7c42da0edd85ef7999c663881ac1e"
+uuid = "528830af-5a63-567c-a44a-034ed33b8444"
+version = "0.10.1+1"
+
 [[HTTP]]
 deps = ["Base64", "Dates", "IniFile", "Logging", "MbedTLS", "NetworkOptions", "Sockets", "URIs"]
 git-tree-sha1 = "14eece7a3308b4d8be910e265c724a6ba51a9798"
@@ -886,6 +982,11 @@ deps = ["Test"]
 git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
 uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
 version = "0.5.0"
+
+[[InitialValues]]
+git-tree-sha1 = "7f6a4508b4a6f46db5ccd9799a3fc71ef5cad6e6"
+uuid = "22cec73e-a1b8-11e9-2c92-598750a2cf9c"
+version = "0.2.11"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -1085,6 +1186,12 @@ git-tree-sha1 = "2b1dfcba103de714d31c033b5dacc2e4a12c7caa"
 uuid = "c03570c3-d221-55d1-a50c-7939bbd78826"
 version = "0.4.4"
 
+[[MicroCollections]]
+deps = ["BangBang", "Setfield"]
+git-tree-sha1 = "4f65bdbbe93475f6ff9ea6969b21532f88d359be"
+uuid = "128add7d-3638-4c79-886c-908ea0c25c34"
+version = "0.1.1"
+
 [[Missings]]
 deps = ["DataAPI"]
 git-tree-sha1 = "bf210ce90b6c9eed32d25dbcae1ebc565df2687f"
@@ -1272,6 +1379,12 @@ git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
 
+[[Referenceables]]
+deps = ["Adapt"]
+git-tree-sha1 = "e681d3bfa49cd46c3c161505caddf20f0e62aaa9"
+uuid = "42d2dcc6-99eb-4e98-b66c-637b7d73030e"
+version = "0.1.2"
+
 [[Requires]]
 deps = ["UUIDs"]
 git-tree-sha1 = "4036a3bd08ac7e968e27c203d45f5fff15020621"
@@ -1289,6 +1402,12 @@ version = "1.1.0"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "Requires"]
+git-tree-sha1 = "def0718ddbabeb5476e51e5a43609bee889f285d"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "0.8.0"
 
 [[SharedArrays]]
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
@@ -1324,6 +1443,12 @@ deps = ["FastGaussQuadrature", "HypergeometricFunctions", "Intervals", "LinearAl
 git-tree-sha1 = "01f9b7bbbea99e0d1c3703fb654ebe41a445daa3"
 uuid = "a25cea48-d430-424a-8ee7-0d3ad3742e9e"
 version = "0.2.6"
+
+[[SplittablesBase]]
+deps = ["Setfield", "Test"]
+git-tree-sha1 = "39c9f91521de844bad65049efd4f9223e7ed43f9"
+uuid = "171d559e-b47b-412a-8079-5efa626c420e"
+version = "0.1.14"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
@@ -1380,11 +1505,23 @@ uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
+[[ThreadsX]]
+deps = ["ArgCheck", "BangBang", "ConstructionBase", "InitialValues", "MicroCollections", "Referenceables", "Setfield", "SplittablesBase", "Transducers"]
+git-tree-sha1 = "abcff3ac31c7894550566be533b512f8b059104f"
+uuid = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
+version = "0.1.8"
+
 [[TimeZones]]
 deps = ["Dates", "Future", "LazyArtifacts", "Mocking", "Pkg", "Printf", "RecipesBase", "Serialization", "Unicode"]
 git-tree-sha1 = "6c9040665b2da00d30143261aea22c7427aada1c"
 uuid = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 version = "1.5.7"
+
+[[Transducers]]
+deps = ["Adapt", "ArgCheck", "BangBang", "Baselet", "CompositionsBase", "DefineSingletons", "Distributed", "InitialValues", "Logging", "Markdown", "MicroCollections", "Requires", "Setfield", "SplittablesBase", "Tables"]
+git-tree-sha1 = "bccb153150744d476a6a8d4facf5299325d5a442"
+uuid = "28d57a85-8fef-5791-bfe6-a80928e7c999"
+version = "0.4.67"
 
 [[URIs]]
 git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"
@@ -1558,6 +1695,12 @@ git-tree-sha1 = "cc4bf3fdde8b7e3e9fa0351bdeedba1cf3b7f6e6"
 uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
 version = "1.5.0+0"
 
+[[ZygoteRules]]
+deps = ["MacroTools"]
+git-tree-sha1 = "8c1a8e4dfacb1fd631745552c8db35d0deb09ea0"
+uuid = "700de1a5-db45-46bc-99cf-38207098b444"
+version = "0.2.2"
+
 [[libass_jll]]
 deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
 git-tree-sha1 = "5982a94fcba20f02f42ace44b9894ee2b140fe47"
@@ -1631,6 +1774,7 @@ version = "0.9.1+5"
 # ╠═8a2353da-068e-4297-8420-7a672ff2df1d
 # ╟─8d935f79-f2da-4d41-8dad-85cd08197d17
 # ╠═95351552-1468-4f22-83b1-1b089fdb5b33
+# ╠═981f93cd-3b62-48ba-b161-61b9513c7aaf
 # ╠═8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
 # ╠═a17f0654-0038-4320-85ca-65221ada0e23
 # ╠═cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
@@ -1643,9 +1787,10 @@ version = "0.9.1+5"
 # ╟─0af8099e-0efe-44d2-83e4-abe0d84a900a
 # ╠═8c3b9f88-4a8b-4d4e-b451-dbf8e2cba69a
 # ╟─094e5734-ea75-45d7-b09d-0fe6c6e4c4b5
-# ╟─27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
+# ╠═27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
 # ╟─833904d3-02c1-44c1-b890-219729e9045c
 # ╠═7913a2aa-6829-4de1-933e-2cb083701b6d
+# ╠═6208b5ee-eca0-4905-93a9-182992bd3647
 # ╟─4071e48b-7911-4d90-94d3-746cb9b667ef
 # ╠═164aad2d-f4aa-4b29-8fbb-e5ab6758492b
 # ╟─c4d4523b-e73d-479f-a169-6e40b1f09683
@@ -1667,8 +1812,11 @@ version = "0.9.1+5"
 # ╠═8ab5e521-395b-4539-9617-67a8b64011af
 # ╟─890f0d73-3fa4-4ea6-a00a-c3672e8d0fa2
 # ╠═9b3c542e-579b-4f66-8518-4e234cd7c0e7
+# ╠═6c1097c4-ac7d-42a7-8241-e185f25b44ab
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
+# ╠═aed1a891-a5bb-469b-9771-43cb0945d214
+# ╠═fecb4b5e-9046-4cf2-8b82-8f34b09dd662
 # ╠═10393148-b9b0-44a0-9b47-c6780318316b
 # ╠═81ab1954-a65e-4633-a340-2e707e5ce879
 # ╠═6b4745bf-e13f-4f20-9bda-4dd37662325b
