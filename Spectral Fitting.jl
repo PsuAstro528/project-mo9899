@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.16.1
+# v0.17.0
 
 using Markdown
 using InteractiveUtils
@@ -429,8 +429,70 @@ begin
 	end
 end
 
+# ╔═╡ fd1094bd-e0fa-466c-b87b-11fbe4b320d5
+function fit_lines_v0_serial(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer=num_gh_orders ) where
+			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
+			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
+	
+	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+	
+	@assert size(λ) == size(flux) == size(var)
+	n_pix = length(λ)
+	n_lines = length(λ_lines)
+	n = length(λ)
+	@assert n_lines >= 1 
+	@assert 1 <= order <= length(gh_polynomials) 
+	@assert n_pix > 1 + order*n_lines  # number of fit parameters
+	covar = PDiagMat(var)   # diagonal covariance matrix
+	design_matrix = ones(n_pix,1)
+	
+	fitted_lines = []
+	fitted_losses = []
+	for i in 1:n_lines
+		λ_line = λ_lines[i]
+		σ_line = 0.04
+		#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
+		lowest_idx = closest_index(λ, λ_line-0.25*σ_line)
+		highest_idx = closest_index(λ, λ_line+0.25*σ_line)
+		
+		losses = zeros(highest_idx-lowest_idx+1)
+		line_tries = []
+		for j = lowest_idx:highest_idx
+			λ_to_fit = λ[j]
+
+			line = AbsorptionLine(λ_to_fit, σ_line,(@SVector zeros(order)) ) #create a line data-structure 
+			design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
+			Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
+			X_inv_covar_y =   design_matrix' * (covar \ flux ) 
+			coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
+			line = AbsorptionLine(λ_to_fit, σ_line, coeff_hat[2:end] )
+			
+			push!(line_tries, line)
+			#line_tries.append(line)
+			#calculating loss for this fit
+			lowest_loss_idx = closest_index(λ, λ_line-2.5*σ_line)
+			highest_loss_idx = closest_index(λ, λ_line+2.5*σ_line)
+			loss = 0.0
+			for k = lowest_loss_idx:highest_loss_idx
+				loss+=abs(flux[k]-line.(λ[k]))
+			end
+			losses[j-lowest_idx+1] = loss
+		end
+		
+		#find fit with lowest loss
+		best_fit_loss, best_fit_idx = findmin(losses)
+		best_fit_λ = λ[best_fit_idx]
+		best_fit_line = line_tries[best_fit_idx]
+		
+		push!(fitted_lines, best_fit_line)
+		push!(fitted_losses, best_fit_loss)
+	end
+	return SpectrumModel(1,fitted_lines), fitted_losses
+	
+end
+
 # ╔═╡ d09a3103-c466-4eb7-8745-7cd1366d6beb
-function fit_lines_v0(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer=num_gh_orders ) where
+function fit_lines_v0_parallel(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer=num_gh_orders ) where
 			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 	
@@ -491,9 +553,17 @@ function fit_lines_v0(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote
 	
 end
 
+# ╔═╡ 9454bb95-ee0b-45f6-9f0f-f10d2e7e5fde
+with_terminal() do
+	fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var)
+	time_serial = @time fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var)	
+	fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var)
+	time_parallel = @time fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var)	
+end
+
 # ╔═╡ 9a06230b-2c9d-43e9-ab7f-00d9b62c44d0
 begin
-	fitted0 = fit_lines_v0(λ_lines,df.λ,df.flux,df.var)
+	fitted0 = fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var)
 	fitted_lines = fitted0[1].lines
 	losses0 = fitted0[2]
 	
@@ -1772,7 +1842,7 @@ version = "0.9.1+5"
 # ╠═c9a3550e-ab84-44d4-a935-64e80ed51d63
 # ╠═4e568854-a031-43b8-a2fc-ea5f6da0b89f
 # ╠═8a2353da-068e-4297-8420-7a672ff2df1d
-# ╟─8d935f79-f2da-4d41-8dad-85cd08197d17
+# ╠═8d935f79-f2da-4d41-8dad-85cd08197d17
 # ╠═95351552-1468-4f22-83b1-1b089fdb5b33
 # ╠═981f93cd-3b62-48ba-b161-61b9513c7aaf
 # ╠═8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
@@ -1781,7 +1851,9 @@ version = "0.9.1+5"
 # ╟─37309807-cd50-4196-a283-473ee937346a
 # ╟─3137a014-873f-48e5-96d5-49375c3f3ef0
 # ╠═26c1319c-8f39-42d8-a3b7-588ac90054d6
+# ╠═fd1094bd-e0fa-466c-b87b-11fbe4b320d5
 # ╠═d09a3103-c466-4eb7-8745-7cd1366d6beb
+# ╠═9454bb95-ee0b-45f6-9f0f-f10d2e7e5fde
 # ╠═9a06230b-2c9d-43e9-ab7f-00d9b62c44d0
 # ╠═53975fd7-27e3-4b13-998c-24721dadd0bf
 # ╟─0af8099e-0efe-44d2-83e4-abe0d84a900a
