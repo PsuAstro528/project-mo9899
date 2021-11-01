@@ -32,6 +32,7 @@
 * We will also use the recurrence relation soon, to use a taylor expansion of a G-H polynomial fit to find shifts in lines, rather than the method we descibe below
 * Use the Hermite coefficients to examine the shifts in solar data and attribute to physical processes on the sun
 * Fit to more lines. We are currently only fitting to the original set of lines, and while (as you can see in the comment in the code) it should be relatively easy to extend to more lines, this has given some issues, and we have not done it yet.
+* We appreciate the patience of the reviewer, as we will soon move the code from one long pluto notebook into local .jl files. We simply have not been able to do so yet.
 
 ### For Reviewers
 * We see a significant increase in computational efficiency from the serial to parallel version of fit_lines_v0, where the parallel usually runs 4-12 times faster on 
