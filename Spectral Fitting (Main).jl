@@ -39,6 +39,7 @@ begin
 	using LinearAlgebra, PDMats # used by periodogram.jl
 	using Random
 	Random.seed!(123)
+	using FLoops
 end;
 
 # ╔═╡ 359c4661-eced-4645-af6e-d862850ab341
@@ -307,48 +308,21 @@ end
 # ╔═╡ c26a6598-3ea3-4f60-b04b-43afc3cbc9bb
 md"# Benchmarking"
 
-# ╔═╡ 9454bb95-ee0b-45f6-9f0f-f10d2e7e5fde
-with_terminal() do
-	fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
-	time_serial = @time fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)	
-	fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
-	time_parallel = @time fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)	
-end
-
 # ╔═╡ 069f3d91-c287-421a-857d-2fb13fe35fc9
 md"# Testing"
 
-# ╔═╡ d364758b-7ddb-4291-a844-b144a49acc0e
-md"""
-# Future Works
-
-## Next Steps
-* Find a way to automatically find a good fit σ for each line
-* Use values of the Gauss-Hermite Coefficients to characterize each line
-"""
-
-# ╔═╡ 914f9545-adc1-4d9e-8260-dd75834328f0
-md"""
-#### Finding a better fit σ
-###### For the 17 known solar lines we fit above, we fine tune a σ that captures the shape of the absorption line dip by eye. The next step would be to find a σ for any given dip from the observed data automatically through Julia. All σs are approximately equal to 0.04.
-
-#### Gauss-Hermite Coefficients
-###### Each of the four Gauss-Hermite Coefficients that are found for each absorption line fit represents some information about the shape of the line. For example, the first coeffient represents the depth of the line, the second coefficient represents the asymmetry of the line and so forth. The next step is to use the four coefficients found by the Gauss-Hermite fit to characterize each line, and then to find broadening patterns that could be due to doppler broadening or pressure broadening and so on.
-"""
-
-# ╔═╡ 5f14a35b-63aa-4a31-ab2d-38d84f005e67
-md"""
-##### The following are for testing and benchmarking, which we have not fully implemented yet. 
-"""
-
-# ╔═╡ 9adb91d3-cffe-4226-b1db-ef100fcbee40
-with_terminal() do
-	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
-	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
+# ╔═╡ cc51e5bb-dffb-4a3b-9a21-1c5b426c59c5
+begin
+	fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = 
+	num_gh_orders)
+	fitted_timing_serial = fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
 end
 
-# ╔═╡ a0cdca55-c6db-4f9e-90a3-89704637f62b
-l_test = AbsorptionLine(4577.6,0.04,(@SVector [1.0,0.5,0.3,0.2]) )
+# ╔═╡ 3507a4c3-5602-4c00-9cc1-c82029a69359
+begin
+	fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
+	timing_parallel = fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
+end
 
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
@@ -359,6 +333,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
+FLoops = "cc61a311-1640-44b5-9fba-1b764f453329"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 Gumbo = "708ec375-b3d6-5a57-a7ce-8257bf98657a"
@@ -383,6 +358,7 @@ ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 BenchmarkTools = "~1.2.0"
 DataFrames = "~1.2.2"
 FITSIO = "~0.16.9"
+FLoops = "~0.1.11"
 FillArrays = "~0.12.6"
 FlameGraphs = "~0.2.6"
 Gumbo = "~0.8.0"
@@ -527,6 +503,12 @@ git-tree-sha1 = "f74e9d5388b8620b4cee35d4c5a618dd4dc547f4"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 version = "1.3.0"
 
+[[ContextVariablesX]]
+deps = ["Compat", "Logging", "UUIDs"]
+git-tree-sha1 = "8ccaa8c655bc1b83d2da4d569c9b28254ababd6e"
+uuid = "6add18c4-b38d-439d-96f6-d6bc489c04c5"
+version = "0.1.2"
+
 [[Contour]]
 deps = ["StaticArrays"]
 git-tree-sha1 = "9f02045d934dc030edad45944ea80dbd1f0ebea7"
@@ -627,6 +609,18 @@ deps = ["CFITSIO", "Printf", "Reexport", "Tables"]
 git-tree-sha1 = "ba5eb4020e474b1c1d4952f91dd7bbfb97b5bf98"
 uuid = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 version = "0.16.9"
+
+[[FLoops]]
+deps = ["Compat", "FLoopsBase", "JuliaVariables", "MLStyle", "Serialization", "Setfield", "Transducers"]
+git-tree-sha1 = "7cb2eb7e5d824885a4d5e0a7870660c01ac394c2"
+uuid = "cc61a311-1640-44b5-9fba-1b764f453329"
+version = "0.1.11"
+
+[[FLoopsBase]]
+deps = ["ContextVariablesX"]
+git-tree-sha1 = "cf3d8b2527be12d204d06aba922b30339a9653dd"
+uuid = "b9860ae5-e623-471e-878b-f6a53c775ea6"
+version = "0.1.0"
 
 [[FastGaussQuadrature]]
 deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
@@ -838,6 +832,12 @@ git-tree-sha1 = "d735490ac75c5cb9f1b00d8b5509c11984dc6943"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.0+0"
 
+[[JuliaVariables]]
+deps = ["MLStyle", "NameResolution"]
+git-tree-sha1 = "49fb3cb53362ddadb4415e9b73926d6b40709e70"
+uuid = "b14d175d-62b4-44ba-8fb7-3064adc8c3ec"
+version = "0.2.4"
+
 [[LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
@@ -957,6 +957,11 @@ version = "0.3.3"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
+[[MLStyle]]
+git-tree-sha1 = "594e189325f66e23a8818e5beb11c43bb0141bcd"
+uuid = "d8e11817-5142-5d16-987a-aa16d5891078"
+version = "0.4.10"
+
 [[MacroTools]]
 deps = ["Markdown", "Random"]
 git-tree-sha1 = "5a5bc6bf062f0f95e62d0fe0a2d99699fed82dd9"
@@ -1028,6 +1033,12 @@ version = "0.2.20"
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.5"
+
+[[NameResolution]]
+deps = ["PrettyPrint"]
+git-tree-sha1 = "1a0fa0e9613f46c9b8c11eee38ebb4f590013c5e"
+uuid = "71a1bf82-56d0-4bbc-8a3c-48b961074391"
+version = "0.1.5"
 
 [[NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
@@ -1146,6 +1157,11 @@ deps = ["TOML"]
 git-tree-sha1 = "00cfd92944ca9c760982747e9a1d0d5d86ab1e5a"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.2.2"
+
+[[PrettyPrint]]
+git-tree-sha1 = "632eb4abab3449ab30c5e1afaa874f0b98b586e4"
+uuid = "8162dcfd-2161-5ef2-ae6c-7681170c5f98"
+version = "0.2.0"
 
 [[PrettyTables]]
 deps = ["Crayons", "Formatting", "Markdown", "Reexport", "Tables"]
@@ -1612,13 +1628,9 @@ version = "0.9.1+5"
 # ╠═71b6349d-f212-4cad-85b8-7d3847dc39cb
 # ╠═5252c6b1-d438-416c-a47c-3692be5a2935
 # ╟─c26a6598-3ea3-4f60-b04b-43afc3cbc9bb
-# ╠═9454bb95-ee0b-45f6-9f0f-f10d2e7e5fde
 # ╟─069f3d91-c287-421a-857d-2fb13fe35fc9
-# ╠═d364758b-7ddb-4291-a844-b144a49acc0e
-# ╟─914f9545-adc1-4d9e-8260-dd75834328f0
-# ╠═5f14a35b-63aa-4a31-ab2d-38d84f005e67
-# ╠═9adb91d3-cffe-4226-b1db-ef100fcbee40
-# ╠═a0cdca55-c6db-4f9e-90a3-89704637f62b
+# ╠═cc51e5bb-dffb-4a3b-9a21-1c5b426c59c5
+# ╠═3507a4c3-5602-4c00-9cc1-c82029a69359
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═aed1a891-a5bb-469b-9771-43cb0945d214

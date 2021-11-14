@@ -24,50 +24,61 @@ using Statistics: mean
 # ╔═╡ 81ab1954-a65e-4633-a340-2e707e5ce879
 using FillArrays
 
-# ╔═╡ 6b4745bf-e13f-4f20-9bda-4dd37662325b
-using PDMats
-
 # ╔═╡ 4d1ad1b6-788d-4607-b4c3-b37a4cd37e3e
 using StaticArrays
 
 # ╔═╡ 05df8c3f-f679-489f-9e51-e5fad58d9a55
 using Polynomials
 
-# ╔═╡ 83cd8a9e-7bdc-4834-b910-8068767ebfac
-using PlutoUI
+# ╔═╡ ae366e94-e87e-4dec-8424-ae0a4d762ef9
+begin
+	using PlutoUI, PlutoTest, PlutoTeachingTools
+	using BenchmarkTools
+	using Profile,  ProfileSVG, FlameGraphs
+	using Plots # just needed for colorant when color FlameGraphs
+	using LinearAlgebra, PDMats # used by periodogram.jl
+	using Random
+	Random.seed!(123)
+	using FLoops
+end;
 
-# ╔═╡ e533ddde-2ed7-42b3-a1cd-a1e5738cf3b3
-using PlutoTest
+# ╔═╡ 359c4661-eced-4645-af6e-d862850ab341
+md"# Importing Functions From Local File "
 
-# ╔═╡ ce588b8c-4656-4b58-b4e1-9c0ae8b9eefd
-using Plots
+# ╔═╡ ae332935-fa0e-48c3-986e-54998dd3ce72
+begin
+	funcs = ingredients("./src/Support Functions.jl")
+	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs
+end
 
 # ╔═╡ 39311305-5492-441b-8346-23d783a04220
-md"## Read input data"
+md"# Read input data"
 
 # ╔═╡ e624fdcd-df68-4cb7-811a-80154f624a47
 begin
 	data_path = ""  #Data is stored in same directory as this file
 	filename = "neidL1_20210305T170410.fits"   # Just one example
+	f = FITS(joinpath(data_path,filename))
+	order_idx = 40      # Arbitrarily picking just one order for this example
+	pix_fit = 1025:8096  # Exclude pixels near edge of detector where there are issues that complicate things and we don't want to be distracted by
+
+
+
+	#reading in wavelength, flux, and variance data
+	λ_raw = read(f["SCIWAVE"],:,order_idx)
+	flux_raw = read(f["SCIFLUX"],:,order_idx)
+	var_raw = read(f["SCIVAR"],:,order_idx)
+
+
+	#cutting out nans from dataset
+	mask_nonans = findall(.!(isnan.(λ_raw) .| isnan.(flux_raw) .| isnan.(var_raw) ))
+	λ = λ_raw[mask_nonans]
+	flux = flux_raw[mask_nonans]
+	var = var_raw[mask_nonans]
 end
 
-# ╔═╡ 93b5f3b9-8d7a-43e4-9901-d0f8800b2b28
-f = FITS(joinpath(data_path,filename))
-
-# ╔═╡ 79f795c4-a1a6-4e08-a3f1-3bd7bca450ba
-order_idx = 40      # Arbitrarily picking just one order for this example
-
-# ╔═╡ 0a132ecb-c759-4448-823a-9c4727ee6916
-pix_fit = 1025:8096  # Exclude pixels near edge of detector where there are issues that complicate things and we don't want to be distracted by
-
-# ╔═╡ 1870ae31-79bb-4e5d-a7f1-6202cca94867
-begin    # Read in data and exclude any pixels that have issues
-	λ = read(f["SCIWAVE"],:,order_idx)
-	flux = read(f["SCIFLUX"],:,order_idx)
-	var = read(f["SCIVAR"],:,order_idx)
-	mask_nonans = findall(.!(isnan.(λ) .| isnan.(flux) .| isnan.(var) ))
-	mask_fit = pix_fit[findall(.!(isnan.(λ[pix_fit]) .| isnan.(flux[pix_fit]) .| isnan.(var[pix_fit]) ))]
-end
+# ╔═╡ fef84837-477c-4281-8794-c2852f4070eb
+md"### Making sure data is read in properly, using tests on the data."
 
 # ╔═╡ 7ce749a5-226a-4207-8984-9b2fad7560ff
 #making sure the data is read in correctly--all lambdas have a corresponding flux and variance
@@ -78,579 +89,112 @@ end
 
 # ╔═╡ 1d610ca0-6981-48ff-b9d8-76c45807b5e7
 md"""
-## Fit a model to blaze function
+# Removing Background Diffraction Pattern
 """
 
 # ╔═╡ 9b91c66f-efa9-4bb5-b0fd-3ebf20a50316
 md"""
-##### When light passes through a diffraction grating, it takes the shape of a Blaze function, so the observations follow a Blaze shape. We remove the Blaze background here. 
+##### When light passes through a diffraction grating, it takes the shape of a Blaze function, so the observations follow a Blaze shape. We remove the Blaze background here by fitting a model (called Blaze 2) and removing that from the data.
 """
+
+# ╔═╡ ec5afb00-27ae-498f-9a2f-b07afee4e71b
+begin  # Removing Blaze background by dividing observations by blaze function
+	
+	
+	mask_fit = pix_fit[findall(.!(isnan.(λ_raw[pix_fit]) .| isnan.(flux_raw[pix_fit]) .| isnan.(var_raw[pix_fit]) ))]
+	blaze_model0 =  fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
+	pix_gt_100p_it1 = flux[pix_fit]./blaze_model0.(pix_fit) .>= 1.0
+	
+	blaze_model1 =  fit_blaze_model( (1:length(λ)), flux, var,  order=8, mask=pix_fit[pix_gt_100p_it1])
+	pix_gt_100p_it2 = flux[pix_fit]./blaze_model1.(pix_fit) .>= 1.0
+	
+	blaze_model2 =  fit_blaze_model( (1:length(λ)), flux, var,  order=8, mask=pix_fit[pix_gt_100p_it2])
+	
+	
+	local plt = plot()
+	plot!(plt,λ[pix_fit],flux[pix_fit], label="Observation",color=:grey)
+	plot!(λ[pix_fit],blaze_model2.(pix_fit), label="Blaze 2",color=:blue)
+	xlabel!("λ (Å)")
+	ylabel!("Flux")
+
+	
+	
+end
 
 # ╔═╡ cf0842fc-f1b1-416f-be46-c9bc4ceae2be
 md"""
-##### When the Blaze background is removed, the absorption lines look like this.
+##### When the Blaze background is removed, the data takes this shape.
 """
+
+# ╔═╡ c28ee2aa-d3ee-4688-b9a2-cb6b04f31de8
+begin
+	pix_fit1 = closest_index(λ, 4550):closest_index(λ, 4560)
+	local plt = plot(legend=:bottomright)
+	#plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model0.(pix_fit), label="Observation/Blaze 0",color=:red)
+	#plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model1.(pix_fit), label="Observation/Blaze 1",color=:green)
+	#plot!(plt,λ[pix_fit1],flux[pix_fit1]./blaze_model2.(pix_fit1), label="Observation/Blaze 2", color=:blue)
+	plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model2.(pix_fit), label="Observation/Blaze 2", color=:blue)
+
+	xlabel!("λ (Å)")
+	ylabel!("Normalized Flux")
+end
 
 # ╔═╡ 9909c5fb-3e04-4ecf-9399-ccbdf665d35c
 md"""
-##### Picking a small range, where there are just enough lines that can be fitted in series (instead of parallel). The range is λ = 4569.94 angstroms to λ = 4579.8 angstroms. This data is held in a dataframe df.
+##### Picking a small range of wavelengths. The range is λ = 4569.94 angstroms to λ = 4579.8 angstroms. This data is held in a dataframe df.
 """
-
-# ╔═╡ 8a2353da-068e-4297-8420-7a672ff2df1d
-function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
-	#this function finds the index in the array λ of the value that is closest to num_to_find
-	max_val = maximum(λ)
-	min_val = minimum(λ)
-	i_tor = 1 #"tor" as in "to return"
-	min_diff = (max_val-min_val)
-	for i in eachindex(λ)
-		curr_diff = abs(λ[i] - num_to_find)
-		if curr_diff < min_diff
-			i_tor = i
-			min_diff = curr_diff
-		end
-	end
-	@assert i_tor >= 0 #make sure that the function isn't somehow magically returning a negative index
-	@assert i_tor <= length(λ) #make sure the function doesn't return an index that is larger than the arrya
-	return i_tor
-end
 
 # ╔═╡ c9a3550e-ab84-44d4-a935-64e80ed51d63
 begin
-	pix_plt = closest_index(λ, 4569.94):closest_index(λ, 4579.8)
 	
 	
-	#pix_plt = closest_index(λ, 4560):closest_index(λ, 4606) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun. When we move to parallelized code, we will look at all wavelengths, not just this smaller band.
+	
+	pix_plt = closest_index(λ, 4550):closest_index(λ, 4610) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun. When we move to parallelized code, we will look at all wavelengths, not just this smaller band.
+
+	# Building a dataframe, where the fluxes have the blaze background removed
+df = DataFrame( λ=view(λ,pix_plt), 
+				flux=view(flux,pix_plt)./blaze_model2.(pix_plt),
+				var =view(var,pix_plt)./(blaze_model2.(pix_plt)).^2
+				)
 	
 end
 
-# ╔═╡ 8d935f79-f2da-4d41-8dad-85cd08197d17
-md"## Fit one line (for testing purposes)"
-
-# ╔═╡ 95351552-1468-4f22-83b1-1b089fdb5b33
-num_gh_orders = 4 #here we can set the order of GH polynomial fits for the rest of the code
-
-# ╔═╡ 981f93cd-3b62-48ba-b161-61b9513c7aaf
-
-
 # ╔═╡ 37309807-cd50-4196-a283-473ee937346a
-md"## Fit to Real Solar Absorption Lines"
+md"# Fit to Real Solar Absorption Lines"
 
 # ╔═╡ 3137a014-873f-48e5-96d5-49375c3f3ef0
 md"""
 ##### Note: we use a loss function to evaluate the fitting of each line. Loss function is defined as sum[abs(predicted-actual flux)] for λ = λ-3*σ:λ-3*σ
 """
 
+# ╔═╡ f7967636-f51e-4fba-afdb-c8de02da2429
+num_gh_orders = 4 #here we can set the order of GH polynomial fits for the rest of the code
+
 # ╔═╡ 26c1319c-8f39-42d8-a3b7-588ac90054d6
 begin
 	#Found these absorption lines with these standard deviations for each line. 
-	λ_lines = [ 4570.05, 4570.85, 4572.35, 4572.7, 4572.95, 4573.25, 4573.56, 4574.15, 4575.5, 4576.02, 4577.07, 4576.4, 4576.8, 4577.63, 4578.45 ]
-	#λ_lines = [4560.09044269, 4560.27185015, 4560.7138923, 4560.87058731, 4561.19565741, 4561.41477454, 4561.73350736, 4562.36570308, 4562.63219195, 4562.88721176, 4563.23989931, 4563.41910949, 4563.76449209, 4564.17151481, 4564.34024273, 4564.69744168, 4564.82724255, 4565.5196282, 4565.66471622, 4566.23229193, 4566.51949452, 4566.87124681, 4567.40957888, 4568.32947197, 4568.60675666, 4568.77955633, 4569.35589751, 4569.61424051, 4570.02161725, 4570.37846574, 4571.09895901, 4571.43706403, 4571.67596248, 4571.97850945, 4572.27601199, 4572.60413885, 4572.86475639, 4573.80826847, 4573.9777376, 4574.22058447, 4574.47278377, 4574.72227641, 4575.10790085, 4575.54216767, 4575.78807278, 4576.33735793, 4577.17797639, 4577.48371817, 4577.69571021, 4578.03225993, 4578.32482976, 4578.55743589, 4579.05844195, 4579.32999314, 4579.51175328, 4579.67461995, 4579.81960761, 4580.05636844, 4580.41671944, 4580.5881527, 4581.04111864, 4581.20192551, 4582.30743629, 4582.49483022, 4582.83395544, 4583.12727938, 4583.41373121, 4583.83832133, 4584.28107653, 4584.81731555, 4585.08049157, 4585.34095137, 4585.8742966, 4586.22544989, 4586.3712534, 4587.13181633, 4587.72177531, 4588.20292127, 4588.68796051, 4589.01082716, 4589.29840078, 4589.95113751, 4590.7903537, 4591.110535, 4591.39612609, 4592.05460424, 4592.36460681, 4592.65733244, 4593.17249527, 4593.52895394, 4593.92276107, 4594.11902026, 4594.41880008, 4594.63251674, 4594.89747512, 4595.36207176, 4595.59618168, 4596.0598587, 4596.41240259, 4596.57597596, 4596.90736432, 4597.24435651, 4597.38289242, 4597.75193956, 4597.86998627, 4598.12294754, 4598.37433123, 4598.74391477, 4598.99676453, 4599.22776442, 4599.84019949, 4600.10956905, 4600.36277084, 4600.75496545, 4600.98933507, 4602.00568367, 4602.94726271, 4603.34340716, 4603.94811757, 4604.2386484, 4604.55836275, 4604.99229269, 4605.36751583]
+	#λ_lines = [ 4555.3,4559.95, 4563.23989931, 4563.41910949, 4563.76449209, 4564.17151481, 4564.34024273, 4564.69744168, 4564.82724255, 4565.5196282, 4565.66471622, 4566.23229193, 4566.51949452, 4566.87124681, 4567.40957888, 4568.32947197, 4568.60675666, 4568.77955633, 4569.35589751, 4569.61424051, 4570.02161725, 4570.37846574, 4571.09895901, 4571.43706403, 4571.67596248, 4571.97850945, 4572.27601199, 4572.60413885, 4572.86475639, 4573.80826847, 4573.9777376, 4574.22058447, 4574.47278377, 4574.72227641, 4575.10790085, 4575.54216767, 4575.78807278, 4576.33735793, 4577.17797639, 4577.48371817, 4577.69571021, 4578.03225993, 4578.32482976, 4578.55743589, 4579.05844195, 4579.32999314, 4579.51175328, 4579.67461995, 4579.81960761, 4580.05636844, 4580.41671944, 4580.5881527, 4581.04111864, 4581.20192551, 4582.30743629, 4582.49483022, 4582.83395544, 4583.12727938, 4583.41373121, 4583.83832133, 4584.28107653, 4584.81731555, 4585.08049157, 4585.34095137, 4585.8742966, 4586.22544989, 4586.3712534, 4587.13181633, 4587.72177531, 4588.20292127, 4588.68796051, 4589.01082716, 4589.29840078, 4589.95113751, 4590.7903537, 4591.110535, 4591.39612609, 4592.05460424, 4592.36460681, 4592.65733244, 4593.17249527, 4593.52895394, 4593.92276107, 4594.11902026, 4594.41880008, 4594.63251674, 4594.89747512, 4595.36207176, 4595.59618168, 4596.0598587, 4596.41240259, 4596.57597596, 4596.90736432, 4597.24435651, 4597.38289242, 4597.75193956, 4597.86998627, 4598.12294754, 4598.37433123, 4598.74391477, 4598.99676453, 4599.22776442, 4599.84019949] #length 103
 
-	
-	#σ_lines = [0.04, 0.04, 0.04, 0.04, 0.03, 0.04, 0.03, 0.03, 0.04, 0.03, 0.03, 0.03, 0.04, 0.04, 0.03]
-	
-	
-	
-	#σ_lines = [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
+λ_lines_eyeball = [4550.0, 4552.042, 4553.75, 4555.3,4556.76, 4557.2, 4557.4, 4561.341, 4562.63, 4565, 4566.87124681,  4567.69, 4568.3, 4569.5, 4570, 4570.8, 4572.4, 4573.4, 4575.39, 4575.9, 4577.5, 4578.58, 4580, 4581.4, 4581.8, 4582.7, 4584.01, 4585, 4586, 4587.1, 4587.5, 4588.53, 4589.5, 4591.3, 4592.6, 4593.475, 4594, 4595.28, 4596.5, 4597.4, 4599, 4599.5, 4601, 4601.5, 4602, 4603.18, 4604.1, 4605.9, 4606.2, 4606.8, 4607.63, 4608.5, 4609] # has length 53
+
+	λ_lines = λ_lines_eyeball
 end;
 
-# ╔═╡ 0af8099e-0efe-44d2-83e4-abe0d84a900a
-md"""
-###### The next test is making sure loss isn't ridiculously large for any of the fits (we assume "ridiculously large" is a loss larger than 15 or so). The assumption is that if the loss is so large, one of the fits is either very bad or there was some runtime error somewhere. Ostensibly, this is our regression test-it tests how good the regression has gone.
-"""
+# ╔═╡ c26a6598-3ea3-4f60-b04b-43afc3cbc9bb
+md"# Benchmarking"
 
-# ╔═╡ 094e5734-ea75-45d7-b09d-0fe6c6e4c4b5
-md"""
-### Plotting all lines with 3σ bounds (in green)
-"""
-
-# ╔═╡ 833904d3-02c1-44c1-b890-219729e9045c
-md"""
-### Printing out Losses
-"""
-
-# ╔═╡ 4071e48b-7911-4d90-94d3-746cb9b667ef
-md"""
-### Printing out Gauss-Hermite coefficients
-"""
-
-# ╔═╡ c4d4523b-e73d-479f-a169-6e40b1f09683
-md"""
-##### Running tests on the found Gauss-Hermite Coefficients
-"""
-
-# ╔═╡ d364758b-7ddb-4291-a844-b144a49acc0e
-md"""
-# Future Works
-
-## Next Steps
-* Find a way to automatically find a good fit σ for each line
-* Use values of the Gauss-Hermite Coefficients to characterize each line
-"""
-
-# ╔═╡ 914f9545-adc1-4d9e-8260-dd75834328f0
-md"""
-#### Finding a better fit σ
-###### For the 17 known solar lines we fit above, we fine tune a σ that captures the shape of the absorption line dip by eye. The next step would be to find a σ for any given dip from the observed data automatically through Julia. All σs are approximately equal to 0.04.
-
-#### Gauss-Hermite Coefficients
-###### Each of the four Gauss-Hermite Coefficients that are found for each absorption line fit represents some information about the shape of the line. For example, the first coeffient represents the depth of the line, the second coefficient represents the asymmetry of the line and so forth. The next step is to use the four coefficients found by the Gauss-Hermite fit to characterize each line, and then to find broadening patterns that could be due to doppler broadening or pressure broadening and so on.
-"""
-
-# ╔═╡ 5f14a35b-63aa-4a31-ab2d-38d84f005e67
-md"""
-##### The following are for testing and benchmarking, which we have not fully implemented yet. 
-"""
-
-# ╔═╡ ec7f2e98-b0c8-40ed-a8b1-7d50bbd84503
-md"""
-# Helper Code
-"""
-
-# ╔═╡ fe94411c-4e48-47dc-a358-50a33190cd98
-md"## Model for synthetic spectrum"
-
-# ╔═╡ fa1ccd0e-f2b9-4fae-8e2a-205ecf3ce0b4
-md"## Blaze function model"
-
-# ╔═╡ 926724fe-e1d9-4409-8b99-ec857e1eb0e5
+# ╔═╡ c10ef1d9-ce6c-4b18-869a-c33579b3fd8e
 begin
-	struct BlazeModel{T}
-		x_mean::T
-		polyn::Polynomial{T,:x}
-	end
-	
-	function (blaze::BlazeModel{T})(x::T1)   where { T<:Number, T1<:Number } 
-		blaze.polyn(x-blaze.x_mean)
-	end
+	fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = 
+	num_gh_orders)
+	@benchmark fitted_timing_serial = fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
 end
 
-# ╔═╡ d537f5a4-50bb-47cc-a960-e9f9b6699ecb
-function fit_blaze_model_v0(x::V1, flux::V2, var::V3,
-						T::Type = promote_type(T1,T2,T3); order::Integer = 8, mask = 1:length(x)  ) where
-			{ T1<:Number, T2<:Number, T3<:Number,
-			V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
-	x_mean = mean(x[mask])
-	fit_result = fit( x[mask].-x_mean, 
-					  flux[mask], order, weights=1.0./var[mask] )
-	return BlazeModel{T}(x_mean,fit_result)
-end
-
-# ╔═╡ 8ab5e521-395b-4539-9617-67a8b64011af
-function fit_blaze_model(x::V1, flux::V2, var::V3,
-						T::Type = promote_type(T1,T2,T3); order::Integer = 8, mask = 1:length(x)  ) where
-			{ T1<:Number, T2<:Number, T3<:Number,
-			V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
-	x_mean = mean(view(x,mask))
-	fit_result = fit( view(x,mask).-x_mean,
-					  view(flux,mask), order, weights=1.0./view(var,mask) )
-	return BlazeModel{T}(x_mean,fit_result)
-end
-
-# ╔═╡ d25d1008-fd70-4fdb-8adf-8710cc938eb0
-# Simplistic fit of polynomial to take out broad pattern to blaze function of spectrograph.  For demo, I just did two itteration of clipping low points (i.e., very likely to be in lines)
-# There are much fancier strategies E.g., https://github.com/RvSpectML/NeidSolarScripts.jl/blob/main/src/continuum_rassine_like.jl  But that's likely more detailed than you need to be for this project and trying ot use it could create a distraction.
-blaze_model0 =  fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
-
-# ╔═╡ 984b85cd-e109-4a00-8c6a-c0efa7dcf35e
-begin  # Refit to pixels chosen to not be obviously in lines
-	pix_gt_100p_it1 = flux[pix_fit]./blaze_model0.(pix_fit) .>= 1.0
-	blaze_model1 =  fit_blaze_model( (1:length(λ)), flux, var,  order=8, mask=pix_fit[pix_gt_100p_it1])
-end
-
-# ╔═╡ 7cb4a165-89a2-4020-b74d-ab01ed308965
-begin  # Removing Blaze background by dividing observations by blaze function
-	pix_gt_100p_it2 = flux[pix_fit]./blaze_model1.(pix_fit) .>= 1.0
-	blaze_model2 =  fit_blaze_model( (1:length(λ)), flux, var,  order=8, mask=pix_fit[pix_gt_100p_it2])
-end
-
-# ╔═╡ 1baecae4-72cd-43fb-9b27-c619133eb915
+# ╔═╡ 3507a4c3-5602-4c00-9cc1-c82029a69359
 begin
-	#plotting observation versus the modeled blaze function
-	local plt = plot()
-	plot!(plt,λ[pix_fit],flux[pix_fit], label="Observation",color=:grey)
-	plot!(λ[pix_fit],blaze_model2.(pix_fit), label="Blaze 2",color=:blue)
-	xlabel!("λ (Å)")
-	ylabel!("Flux")
+	fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
+	@benchmark  timing_parallel = fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
 end
-
-# ╔═╡ c28ee2aa-d3ee-4688-b9a2-cb6b04f31de8
-begin
-	local plt = plot(legend=:bottomright)
-	#plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model0.(pix_fit), label="Observation/Blaze 0",color=:red)
-	#plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model1.(pix_fit), label="Observation/Blaze 1",color=:green)
-	plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model2.(pix_fit), label="Observation/Blaze 2", color=:blue)
-	xlabel!("λ (Å)")
-	ylabel!("Normalized Flux")
-end
-
-# ╔═╡ 4e568854-a031-43b8-a2fc-ea5f6da0b89f
-# Build dataframe of pixels for plotting (and eventually fitting spectral lines to) in window selected by pix_plt
-df = DataFrame( λ=view(λ,pix_plt), 
-				flux=view(flux,pix_plt)./blaze_model2.(pix_plt),
-				var =view(var,pix_plt)./(blaze_model2.(pix_plt)).^2
-				)
-
-# ╔═╡ 9adb91d3-cffe-4226-b1db-ef100fcbee40
-with_terminal() do
-	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
-	@time fit_blaze_model(1:length(λ),flux,var,order=8, mask=mask_fit)
-end
-
-# ╔═╡ 890f0d73-3fa4-4ea6-a00a-c3672e8d0fa2
-md"""
-## Gauss-Hermite parameterization of absorption line
-"""
-
-# ╔═╡ 9b3c542e-579b-4f66-8518-4e234cd7c0e7
-begin
-	struct AbsorptionLine
-		λ::Float64
-		σ::Float64
-		gh_coeff::SVector{4,Float64}  # Statically allocated to reduce memory allocations
-	end
-
-	function gaussian(line::AbsorptionLine, λ::Number)
-		exp(-((λ-line.λ)/line.σ)^2//2)
-	end
-	
-	# Precompute Gauss-Hermite polynomials once.
-	# Should move to module, so not in global scope
-	gh_polynomials = [basis(Hermite, i)(variable(Polynomial{Float64})) for i in 0:10]
-	
-	function gauss_hermite_basis(line::AbsorptionLine, λ, order::Integer)
-		@assert 1 <= order+1 <= length(gh_polynomials)
-		T = typeof(line.λ)
-		gh_poly::Polynomial{T,:x} = gh_polynomials[order+1] 
-		x = (λ.-line.λ)./line.σ
-		exp.(-0.5.*x.^2) .* gh_poly.(x)		
-	end
-	
-	function gauss_hermite_basis(line::AbsorptionLine, λ; orders::AbstractVector{Int64} = 1:length(line.gh_coeff) )
-		T = typeof(line.λ)
-		gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials
-		x = (λ.-line.λ)./line.σ
-		g = exp.(-0.5.*x.^2) 
-		p = mapreduce(i->gh_polys[i].(x),hcat,orders)
-		g.*p
-	end
-	
-	function (line::AbsorptionLine)(λ)
-		T = typeof(line.λ)
-		gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials 
-		x = (λ.-line.λ)./line.σ
-		
-		g = exp.(-0.5.*x.^2) 
-		# Could eliminate some allocations in mapreduce with hcat.
-		p = mapreduce(i->line.gh_coeff[i].*gh_polys[i].(x),hcat,1:length(line.gh_coeff))
-		one(λ) .+ sum(g.*p)
-	end
-
-end
-
-# ╔═╡ 8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
-function fit_line_v0(λ_line::Number, σ_line::Number, λ::V1, flux::V2, var::V3, T::Type = promote_type(T1,T2,T3); order::Integer=num_gh_orders ) where
-			{ T1<:Number, T2<:Number, T3<:Number,
-			  V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} }
-	
-	#This function fits to one absorption line only, finding the GH coefficients and the loss of that fit. Note that this takes in an estimate of σ, the standard deviation of the absorption line.
-	@assert size(λ) == size(flux) == size(var)
-	n = length(λ)
-	@assert n > 4  # Minimum for 4 parameter fit
-	covar = PDiagMat(var)   
-	line = AbsorptionLine(λ_line, σ_line, zeros(order) )
-	design_matrix = hcat(ones(n), gauss_hermite_basis(line,λ,orders=1:order))
-	
-	# Generalized linear least squares
-	Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
-	X_inv_covar_y =   design_matrix' * (covar \ flux) 
-	coeff_hat =  Xt_inv_covar_X \ X_inv_covar_y
-	line = AbsorptionLine(λ_line, σ_line, coeff_hat[2:end] )
-	
-	#finding the sum of residuals from λ-3σ to λ+3σ
-	#need to find the index i_1 in λ where λ[i_1] = λ_line, index i_0 in λ where λ[i_0] = λ_line-3σ, and index i_2 in λ where λ[i_2] = λ_line+3σ
-	i_0 = closest_index(λ, λ_line-3*σ_line)
-	i_1 = closest_index(λ, λ_line)
-	i_2 = closest_index(λ, λ_line+3*σ_line)
-	
-	@assert i_0 >= 0 and i_0 < i_1 and i_0 < i_2
-	@assert i_1 >= 0 and i_1 < i_2
-	@assert i_2 >= 0 and i_2 <= length(λ_line)
-	
-	loss = 0.0
-	for i = i_0:i_2
-		loss+=abs(flux[i]-line.(λ[i]))
-	end
-	
-	
-	return line, loss
-end
-
-# ╔═╡ a17f0654-0038-4320-85ca-65221ada0e23
-begin
-	# Fitting to one line, and getting the loss
-	#line = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[1]
-	#loss = fit_line_v0(4570.05,0.02,df.λ,df.flux,df.var)[2]
-	
-	
-	line = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[1]
-	loss = fit_line_v0(4577.62,0.04,df.λ,df.flux,df.var)[2]
-	
-end
-
-# ╔═╡ cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
-begin
-	#plotting observational data with fitted model and a 3-σ window, in green. The left green line is at λ - 3σ and the right green line is at λ + 3σ
-	local plt = plot(legend=:bottomright)
-	plot!(plt,df.λ,df.flux, label="Observation/Blaze")
-	plot!(plt,df.λ,line.(df.λ),label="Model")
-	vline!([4577.62-3*0.04, 4577.62+3*0.04], label="3-σ Window")
-	xlabel!("λ (Å)")
-	ylabel!("Normalized Flux")
-end
-
-# ╔═╡ a0cdca55-c6db-4f9e-90a3-89704637f62b
-l_test = AbsorptionLine(4577.6,0.04,(@SVector [1.0,0.5,0.3,0.2]) )
-
-# ╔═╡ f5d6e755-140a-44fa-9b9f-6e73227ee9cb
-begin
-	struct SpectrumModel
-		norm::Float64
-		lines::Vector{AbsorptionLine}
-	end
-	
-	function (model::SpectrumModel)(λ)
-		result = fill(model.norm,length(λ))
-		for i in 1:length(model.lines)
-			result .*= model.lines[i].(λ)
-		end
-		return result
-	end
-end
-
-# ╔═╡ fd1094bd-e0fa-466c-b87b-11fbe4b320d5
-function fit_lines_v0_serial(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer=num_gh_orders ) where
-			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
-			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
-	
-	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
-	
-	@assert size(λ) == size(flux) == size(var)
-	n_pix = length(λ)
-	n_lines = length(λ_lines)
-	n = length(λ)
-	@assert n_lines >= 1 
-	@assert 1 <= order <= length(gh_polynomials) 
-	@assert n_pix > 1 + order*n_lines  # number of fit parameters
-	covar = PDiagMat(var)   # diagonal covariance matrix
-	design_matrix = ones(n_pix,1)
-	
-	fitted_lines = []
-	fitted_losses = []
-	for i in 1:n_lines
-		λ_line = λ_lines[i]
-		σ_line = 0.04
-		#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
-		lowest_idx = closest_index(λ, λ_line-0.25*σ_line)
-		highest_idx = closest_index(λ, λ_line+0.25*σ_line)
-		
-		losses = zeros(highest_idx-lowest_idx+1)
-		line_tries = []
-		for j = lowest_idx:highest_idx
-			λ_to_fit = λ[j]
-
-			line = AbsorptionLine(λ_to_fit, σ_line,(@SVector zeros(order)) ) #create a line data-structure 
-			design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
-			Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
-			X_inv_covar_y =   design_matrix' * (covar \ flux ) 
-			coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
-			line = AbsorptionLine(λ_to_fit, σ_line, coeff_hat[2:end] )
-			
-			push!(line_tries, line)
-			#line_tries.append(line)
-			#calculating loss for this fit
-			lowest_loss_idx = closest_index(λ, λ_line-2.5*σ_line)
-			highest_loss_idx = closest_index(λ, λ_line+2.5*σ_line)
-			loss = 0.0
-			for k = lowest_loss_idx:highest_loss_idx
-				loss+=abs(flux[k]-line.(λ[k]))
-			end
-			losses[j-lowest_idx+1] = loss
-		end
-		
-		#find fit with lowest loss
-		best_fit_loss, best_fit_idx = findmin(losses)
-		best_fit_λ = λ[best_fit_idx]
-		best_fit_line = line_tries[best_fit_idx]
-		
-		push!(fitted_lines, best_fit_line)
-		push!(fitted_losses, best_fit_loss)
-	end
-	return SpectrumModel(1,fitted_lines), fitted_losses
-	
-end
-
-# ╔═╡ d09a3103-c466-4eb7-8745-7cd1366d6beb
-function fit_lines_v0_parallel(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer=num_gh_orders ) where
-			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
-			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
-	
-	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
-	
-	@assert size(λ) == size(flux) == size(var)
-	n_pix = length(λ)
-	n_lines = length(λ_lines)
-	n = length(λ)
-	@assert n_lines >= 1 
-	@assert 1 <= order <= length(gh_polynomials) 
-	@assert n_pix > 1 + order*n_lines  # number of fit parameters
-	covar = PDiagMat(var)   # diagonal covariance matrix
-	design_matrix = ones(n_pix,1)
-	
-	fitted_lines = []
-	fitted_losses = []
-	Threads.@threads for i in 1:n_lines
-		λ_line = λ_lines[i]
-		σ_line = 0.04
-		#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
-		lowest_idx = closest_index(λ, λ_line-0.25*σ_line)
-		highest_idx = closest_index(λ, λ_line+0.25*σ_line)
-		
-		losses = zeros(highest_idx-lowest_idx+1)
-		line_tries = []
-		Threads.@threads for j = lowest_idx:highest_idx
-			λ_to_fit = λ[j]
-
-			line = AbsorptionLine(λ_to_fit, σ_line,(@SVector zeros(order)) ) #create a line data-structure 
-			design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
-			Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
-			X_inv_covar_y =   design_matrix' * (covar \ flux ) 
-			coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
-			line = AbsorptionLine(λ_to_fit, σ_line, coeff_hat[2:end] )
-			
-			push!(line_tries, line)
-			#line_tries.append(line)
-			#calculating loss for this fit
-			lowest_loss_idx = closest_index(λ, λ_line-2.5*σ_line)
-			highest_loss_idx = closest_index(λ, λ_line+2.5*σ_line)
-			loss = 0.0
-			Threads.@threads for k = lowest_loss_idx:highest_loss_idx
-				loss+=abs(flux[k]-line.(λ[k]))
-			end
-			losses[j-lowest_idx+1] = loss
-		end
-		
-		#find fit with lowest loss
-		best_fit_loss, best_fit_idx = findmin(losses)
-		best_fit_λ = λ[best_fit_idx]
-		best_fit_line = line_tries[best_fit_idx]
-		
-		push!(fitted_lines, best_fit_line)
-		push!(fitted_losses, best_fit_loss)
-	end
-	return SpectrumModel(1,fitted_lines), fitted_losses
-	
-end
-
-# ╔═╡ 9454bb95-ee0b-45f6-9f0f-f10d2e7e5fde
-with_terminal() do
-	fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var)
-	time_serial = @time fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var)	
-	fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var)
-	time_parallel = @time fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var)	
-end
-
-# ╔═╡ 9a06230b-2c9d-43e9-ab7f-00d9b62c44d0
-begin
-	fitted0 = fit_lines_v0_parallel(λ_lines,df.λ,df.flux,df.var)
-	fitted_lines = fitted0[1].lines
-	losses0 = fitted0[2]
-	
-end
-
-# ╔═╡ 53975fd7-27e3-4b13-998c-24721dadd0bf
-@test length(losses0) == length(fitted_lines) == length(λ_lines) #testing to make sure all the lines have been fitted to, and there is a loss for each fit
-
-# ╔═╡ 8c3b9f88-4a8b-4d4e-b451-dbf8e2cba69a
-@test maximum(losses0) < 15
-
-# ╔═╡ 27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
-begin
-	
-	A = fill(0.0,2*length(λ_lines))
-	
-	
-	N = length(λ_lines)
-	for i in 1:N
-		σ_h = 0.04
-		A[2*(i)-1] = λ_lines[i]-1*σ_h
-		A[2*(i)] = λ_lines[i]+1*σ_h
-	end
-	
-	
-	local plt = plot(legend=:bottomright)
-	
-	plot!(plt,df.λ,df.flux, label="Observation/Fit")
-	plot!(plt,df.λ,fitted0[1](df.λ),label="Model")
-	#vline!(A)
-	
-	
-	xlabel!("λ (Å)")
-	ylabel!("Normalized Flux")
-end
-
-# ╔═╡ 7913a2aa-6829-4de1-933e-2cb083701b6d
-losses0
-
-# ╔═╡ 6208b5ee-eca0-4905-93a9-182992bd3647
-fitted_lines
-
-# ╔═╡ 164aad2d-f4aa-4b29-8fbb-e5ab6758492b
-#reading Gauss-Hermite Coefficients from the fitted lines
-begin
-	
-	
-	num_lines_found = length(fitted_lines)
-	num_gh_coeff = length(fitted_lines[1].gh_coeff)
-	gh_s = reshape(zeros(num_lines_found*num_gh_coeff), num_lines_found, num_gh_coeff)
-	#gh_s = Array{Float64}(undef, length(lines_found), length(lines_found[1].gh_coeff))
-	for i in 1:length(fitted_lines)
-		gh = fitted_lines[i].gh_coeff
-		for j in 1:length(gh)
-			
-			gh_s[i,j] = gh[j]
-		end
-	end
-end
-
-# ╔═╡ 59aad668-6622-4af9-86c6-0e8f36ef03f7
-@test num_lines_found == length(λ_lines) #make sure all lines have been fitted to
-
-# ╔═╡ fe77f6f5-6bd7-47d4-aa49-fa85b555f00e
-@test num_gh_coeff == num_gh_orders #make sure all orders exist
-
-# ╔═╡ 5252c6b1-d438-416c-a47c-3692be5a2935
-with_terminal() do
-	for k in 1:Int(length(gh_s)/num_gh_coeff)
-		println(gh_s[k, :])	
-	end
-end
-
-# ╔═╡ 71b6349d-f212-4cad-85b8-7d3847dc39cb
-#checking if all lines have exactly the same number of gh_coefficients
-begin
-	all_same_size = 1 #1 as in true, if false, it will be 0
-	for i in 1:length(fitted_lines)
-		if (length(fitted_lines[i].gh_coeff) != num_gh_coeff)
-			all_same_size = 0
-		end
-	end
-	@test all_same_size == 1
-end
-
-# ╔═╡ 6c1097c4-ac7d-42a7-8241-e185f25b44ab
-
 
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
@@ -658,16 +202,24 @@ md"## Packages used"
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
+FLoops = "cc61a311-1640-44b5-9fba-1b764f453329"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
+FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 Gumbo = "708ec375-b3d6-5a57-a7ce-8257bf98657a"
 LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PDMats = "90014a1f-27ba-587c-ab20-58faa44d9150"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PlutoTeachingTools = "661c6b06-c737-4d37-b85c-46df65de6f69"
 PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+ProfileSVG = "132c30aa-f267-4189-9183-c8a63c7e05e6"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SpecialPolynomials = "a25cea48-d430-424a-8ee7-0d3ad3742e9e"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -675,16 +227,21 @@ StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 
 [compat]
+BenchmarkTools = "~1.2.0"
 DataFrames = "~1.2.2"
 FITSIO = "~0.16.9"
+FLoops = "~0.1.11"
 FillArrays = "~0.12.6"
+FlameGraphs = "~0.2.6"
 Gumbo = "~0.8.0"
 LazyArrays = "~0.22.2"
 PDMats = "~0.11.1"
 Plots = "~1.22.3"
+PlutoTeachingTools = "~0.1.4"
 PlutoTest = "~0.1.2"
 PlutoUI = "~0.7.14"
 Polynomials = "~2.0.15"
+ProfileSVG = "~0.2.1"
 SpecialPolynomials = "~0.2.6"
 StaticArrays = "~1.2.13"
 StructArrays = "~0.6.3"
@@ -736,6 +293,12 @@ uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 git-tree-sha1 = "aebf55e6d7795e02ca500a689d326ac979aaf89e"
 uuid = "9718e550-a3fa-408a-8086-8db961cd8217"
 version = "0.1.1"
+
+[[BenchmarkTools]]
+deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "61adeb0823084487000600ef8b1c00cc2474cd47"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.2.0"
 
 [[Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -811,6 +374,12 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "f74e9d5388b8620b4cee35d4c5a618dd4dc547f4"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 version = "1.3.0"
+
+[[ContextVariablesX]]
+deps = ["Compat", "Logging", "UUIDs"]
+git-tree-sha1 = "8ccaa8c655bc1b83d2da4d569c9b28254ababd6e"
+uuid = "6add18c4-b38d-439d-96f6-d6bc489c04c5"
+version = "0.1.2"
 
 [[Contour]]
 deps = ["StaticArrays"]
@@ -913,11 +482,29 @@ git-tree-sha1 = "ba5eb4020e474b1c1d4952f91dd7bbfb97b5bf98"
 uuid = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 version = "0.16.9"
 
+[[FLoops]]
+deps = ["Compat", "FLoopsBase", "JuliaVariables", "MLStyle", "Serialization", "Setfield", "Transducers"]
+git-tree-sha1 = "7cb2eb7e5d824885a4d5e0a7870660c01ac394c2"
+uuid = "cc61a311-1640-44b5-9fba-1b764f453329"
+version = "0.1.11"
+
+[[FLoopsBase]]
+deps = ["ContextVariablesX"]
+git-tree-sha1 = "cf3d8b2527be12d204d06aba922b30339a9653dd"
+uuid = "b9860ae5-e623-471e-878b-f6a53c775ea6"
+version = "0.1.0"
+
 [[FastGaussQuadrature]]
 deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
 git-tree-sha1 = "5829b25887e53fb6730a9df2ff89ed24baa6abf6"
 uuid = "442a2c76-b920-505d-bb47-c5924d526838"
 version = "0.4.7"
+
+[[FileIO]]
+deps = ["Pkg", "Requires", "UUIDs"]
+git-tree-sha1 = "2db648b6712831ecb333eae76dbfd1c156ca13bb"
+uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+version = "1.11.2"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
@@ -930,6 +517,12 @@ deps = ["Statistics"]
 git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
 uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
 version = "0.8.4"
+
+[[FlameGraphs]]
+deps = ["AbstractTrees", "Colors", "FileIO", "FixedPointNumbers", "IndirectArrays", "LeftChildRightSiblingTrees", "Profile"]
+git-tree-sha1 = "1d70df6fb4969bc8e2ab04988c950f8b5b87a37e"
+uuid = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
+version = "0.2.6"
 
 [[Fontconfig_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "FreeType2_jll", "JLLWrappers", "Libdl", "Libuuid_jll", "Pkg", "Zlib_jll"]
@@ -1047,6 +640,11 @@ git-tree-sha1 = "f7be53659ab06ddc986428d3a9dcc95f6fa6705a"
 uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
 version = "0.2.2"
 
+[[IndirectArrays]]
+git-tree-sha1 = "c2a145a145dc03a7620af1444e0264ef907bd44f"
+uuid = "9b13fd28-a010-5f03-acff-a1bbcff69959"
+version = "0.5.1"
+
 [[IniFile]]
 deps = ["Test"]
 git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
@@ -1106,6 +704,12 @@ git-tree-sha1 = "d735490ac75c5cb9f1b00d8b5509c11984dc6943"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.0+0"
 
+[[JuliaVariables]]
+deps = ["MLStyle", "NameResolution"]
+git-tree-sha1 = "49fb3cb53362ddadb4415e9b73926d6b40709e70"
+uuid = "b14d175d-62b4-44ba-8fb7-3064adc8c3ec"
+version = "0.2.4"
+
 [[LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
@@ -1138,6 +742,12 @@ version = "0.22.2"
 [[LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
+
+[[LeftChildRightSiblingTrees]]
+deps = ["AbstractTrees"]
+git-tree-sha1 = "71be1eb5ad19cb4f61fa8c73395c0338fd092ae0"
+uuid = "1d6d02ad-be62-4b6b-8a6d-2f90e265016e"
+version = "0.1.2"
 
 [[LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -1219,6 +829,11 @@ version = "0.3.3"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
+[[MLStyle]]
+git-tree-sha1 = "594e189325f66e23a8818e5beb11c43bb0141bcd"
+uuid = "d8e11817-5142-5d16-987a-aa16d5891078"
+version = "0.4.10"
+
 [[MacroTools]]
 deps = ["Markdown", "Random"]
 git-tree-sha1 = "5a5bc6bf062f0f95e62d0fe0a2d99699fed82dd9"
@@ -1290,6 +905,12 @@ version = "0.2.20"
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.5"
+
+[[NameResolution]]
+deps = ["PrettyPrint"]
+git-tree-sha1 = "1a0fa0e9613f46c9b8c11eee38ebb4f590013c5e"
+uuid = "71a1bf82-56d0-4bbc-8a3c-48b961074391"
+version = "0.1.5"
 
 [[NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
@@ -1373,6 +994,12 @@ git-tree-sha1 = "cfbd033def161db9494f86c5d18fbf874e09e514"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 version = "1.22.3"
 
+[[PlutoTeachingTools]]
+deps = ["LaTeXStrings", "Markdown", "PlutoUI", "Random"]
+git-tree-sha1 = "e2b63ee022e0b20f43fcd15cda3a9047f449e3b4"
+uuid = "661c6b06-c737-4d37-b85c-46df65de6f69"
+version = "0.1.4"
+
 [[PlutoTest]]
 deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
 git-tree-sha1 = "b7da10d62c1ffebd37d4af8d93ee0003e9248452"
@@ -1403,6 +1030,11 @@ git-tree-sha1 = "00cfd92944ca9c760982747e9a1d0d5d86ab1e5a"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.2.2"
 
+[[PrettyPrint]]
+git-tree-sha1 = "632eb4abab3449ab30c5e1afaa874f0b98b586e4"
+uuid = "8162dcfd-2161-5ef2-ae6c-7681170c5f98"
+version = "0.2.0"
+
 [[PrettyTables]]
 deps = ["Crayons", "Formatting", "Markdown", "Reexport", "Tables"]
 git-tree-sha1 = "6330e0c350997f80ed18a9d8d9cb7c7ca4b3a880"
@@ -1412,6 +1044,16 @@ version = "1.2.0"
 [[Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+
+[[Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+
+[[ProfileSVG]]
+deps = ["Colors", "FlameGraphs", "Profile", "UUIDs"]
+git-tree-sha1 = "e4df82a5dadc26736f106f8d7fc97c42cc6c91ae"
+uuid = "132c30aa-f267-4189-9183-c8a63c7e05e6"
+version = "0.2.1"
 
 [[Qt5Base_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Fontconfig_jll", "Glib_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "OpenSSL_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libxcb_jll", "Xorg_xcb_util_image_jll", "Xorg_xcb_util_keysyms_jll", "Xorg_xcb_util_renderutil_jll", "Xorg_xcb_util_wm_jll", "Zlib_jll", "xkbcommon_jll"]
@@ -1823,79 +1465,34 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
+# ╠═359c4661-eced-4645-af6e-d862850ab341
+# ╠═ae332935-fa0e-48c3-986e-54998dd3ce72
 # ╟─39311305-5492-441b-8346-23d783a04220
 # ╠═e624fdcd-df68-4cb7-811a-80154f624a47
-# ╠═93b5f3b9-8d7a-43e4-9901-d0f8800b2b28
-# ╠═79f795c4-a1a6-4e08-a3f1-3bd7bca450ba
-# ╠═0a132ecb-c759-4448-823a-9c4727ee6916
-# ╠═1870ae31-79bb-4e5d-a7f1-6202cca94867
+# ╟─fef84837-477c-4281-8794-c2852f4070eb
 # ╠═7ce749a5-226a-4207-8984-9b2fad7560ff
 # ╟─1d610ca0-6981-48ff-b9d8-76c45807b5e7
-# ╠═9b91c66f-efa9-4bb5-b0fd-3ebf20a50316
-# ╠═d25d1008-fd70-4fdb-8adf-8710cc938eb0
-# ╟─1baecae4-72cd-43fb-9b27-c619133eb915
-# ╠═984b85cd-e109-4a00-8c6a-c0efa7dcf35e
-# ╠═7cb4a165-89a2-4020-b74d-ab01ed308965
+# ╟─9b91c66f-efa9-4bb5-b0fd-3ebf20a50316
+# ╠═ec5afb00-27ae-498f-9a2f-b07afee4e71b
 # ╟─cf0842fc-f1b1-416f-be46-c9bc4ceae2be
-# ╟─c28ee2aa-d3ee-4688-b9a2-cb6b04f31de8
+# ╠═c28ee2aa-d3ee-4688-b9a2-cb6b04f31de8
 # ╟─9909c5fb-3e04-4ecf-9399-ccbdf665d35c
-# ╠═c9a3550e-ab84-44d4-a935-64e80ed51d63
-# ╠═4e568854-a031-43b8-a2fc-ea5f6da0b89f
-# ╠═8a2353da-068e-4297-8420-7a672ff2df1d
-# ╠═8d935f79-f2da-4d41-8dad-85cd08197d17
-# ╠═95351552-1468-4f22-83b1-1b089fdb5b33
-# ╠═981f93cd-3b62-48ba-b161-61b9513c7aaf
-# ╠═8774a77f-bdb6-4ea4-a40c-e96695f7d3e3
-# ╠═a17f0654-0038-4320-85ca-65221ada0e23
-# ╠═cd508e5b-e62d-4c4f-9550-8d9ed3ef2d60
+# ╟─c9a3550e-ab84-44d4-a935-64e80ed51d63
 # ╟─37309807-cd50-4196-a283-473ee937346a
 # ╟─3137a014-873f-48e5-96d5-49375c3f3ef0
+# ╠═f7967636-f51e-4fba-afdb-c8de02da2429
 # ╠═26c1319c-8f39-42d8-a3b7-588ac90054d6
-# ╠═fd1094bd-e0fa-466c-b87b-11fbe4b320d5
-# ╠═d09a3103-c466-4eb7-8745-7cd1366d6beb
-# ╠═9454bb95-ee0b-45f6-9f0f-f10d2e7e5fde
-# ╠═9a06230b-2c9d-43e9-ab7f-00d9b62c44d0
-# ╠═53975fd7-27e3-4b13-998c-24721dadd0bf
-# ╟─0af8099e-0efe-44d2-83e4-abe0d84a900a
-# ╠═8c3b9f88-4a8b-4d4e-b451-dbf8e2cba69a
-# ╟─094e5734-ea75-45d7-b09d-0fe6c6e4c4b5
-# ╠═27b02672-1c6c-449d-ab7f-5b9dd18bd8a1
-# ╟─833904d3-02c1-44c1-b890-219729e9045c
-# ╠═7913a2aa-6829-4de1-933e-2cb083701b6d
-# ╠═6208b5ee-eca0-4905-93a9-182992bd3647
-# ╟─4071e48b-7911-4d90-94d3-746cb9b667ef
-# ╠═164aad2d-f4aa-4b29-8fbb-e5ab6758492b
-# ╟─c4d4523b-e73d-479f-a169-6e40b1f09683
-# ╠═59aad668-6622-4af9-86c6-0e8f36ef03f7
-# ╠═fe77f6f5-6bd7-47d4-aa49-fa85b555f00e
-# ╠═71b6349d-f212-4cad-85b8-7d3847dc39cb
-# ╠═5252c6b1-d438-416c-a47c-3692be5a2935
-# ╟─d364758b-7ddb-4291-a844-b144a49acc0e
-# ╟─914f9545-adc1-4d9e-8260-dd75834328f0
-# ╠═5f14a35b-63aa-4a31-ab2d-38d84f005e67
-# ╠═9adb91d3-cffe-4226-b1db-ef100fcbee40
-# ╠═a0cdca55-c6db-4f9e-90a3-89704637f62b
-# ╟─ec7f2e98-b0c8-40ed-a8b1-7d50bbd84503
-# ╟─fe94411c-4e48-47dc-a358-50a33190cd98
-# ╠═f5d6e755-140a-44fa-9b9f-6e73227ee9cb
-# ╟─fa1ccd0e-f2b9-4fae-8e2a-205ecf3ce0b4
-# ╠═926724fe-e1d9-4409-8b99-ec857e1eb0e5
-# ╠═d537f5a4-50bb-47cc-a960-e9f9b6699ecb
-# ╠═8ab5e521-395b-4539-9617-67a8b64011af
-# ╟─890f0d73-3fa4-4ea6-a00a-c3672e8d0fa2
-# ╠═9b3c542e-579b-4f66-8518-4e234cd7c0e7
-# ╠═6c1097c4-ac7d-42a7-8241-e185f25b44ab
+# ╟─c26a6598-3ea3-4f60-b04b-43afc3cbc9bb
+# ╠═c10ef1d9-ce6c-4b18-869a-c33579b3fd8e
+# ╠═3507a4c3-5602-4c00-9cc1-c82029a69359
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═aed1a891-a5bb-469b-9771-43cb0945d214
 # ╠═fecb4b5e-9046-4cf2-8b82-8f34b09dd662
 # ╠═10393148-b9b0-44a0-9b47-c6780318316b
 # ╠═81ab1954-a65e-4633-a340-2e707e5ce879
-# ╠═6b4745bf-e13f-4f20-9bda-4dd37662325b
 # ╠═4d1ad1b6-788d-4607-b4c3-b37a4cd37e3e
 # ╠═05df8c3f-f679-489f-9e51-e5fad58d9a55
-# ╠═83cd8a9e-7bdc-4834-b910-8068767ebfac
-# ╠═e533ddde-2ed7-42b3-a1cd-a1e5738cf3b3
-# ╠═ce588b8c-4656-4b58-b4e1-9c0ae8b9eefd
+# ╠═ae366e94-e87e-4dec-8424-ae0a4d762ef9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

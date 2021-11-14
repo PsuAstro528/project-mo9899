@@ -38,6 +38,7 @@ begin
 	using Plots # just needed for colorant when color FlameGraphs
 	using LinearAlgebra, PDMats # used by periodogram.jl
 	using Random
+	using FLoops
 	Random.seed!(123)
 end;
 
@@ -62,7 +63,7 @@ md"## Importing Functions From Local File "
 # ╔═╡ ae332935-fa0e-48c3-986e-54998dd3ce72
 begin
 	funcs = ingredients("./src/Support Functions.jl")
-	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, gauss_hermite_basis_eval, test_serial_fit_perfect, test_serial_fit_delta
+	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, gauss_hermite_basis_eval, test_fit_perfect, test_fit_delta
 end
 
 # ╔═╡ df04c127-2e90-4322-b20d-b1620ea11eba
@@ -79,29 +80,47 @@ begin
 	artificial_σ = 0.04
 	art_λs = [4500, 4500.3, 4500.6, 4500.9, 4501.2, 4501.5, 4501.8, 4502.1, 4502.4]
 	
-	λ_to_plot = []
-	hh_to_plot = []
+	λ_to_plot_serial = []
+	hh_to_plot_serial = []
 		
-	fitted_lines = []
-	fitted_losses = []
-	fitted_to_plot = []
-	
+	fitted_lines_serial = []
+	fitted_losses_serial = []
+	fitted_to_plot_serial = []
+
+
+	λ_to_plot_parallel = []
+	hh_to_plot_parallel = []
+		
+	fitted_lines_parallel = []
+	fitted_losses_parallel = []
+	fitted_to_plot_parallel = []
 
 	for i in 1:length(art_λs)
 		l_test = AbsorptionLine(art_λs[i], artificial_σ, (@SVector [-1*rand()/4, rand()/4, -1*rand()/4,0]))
 	
 	
-		local_λ, hh, fitted0 = test_serial_fit_perfect(l_test)
-		fitted_line = fitted0[1]
-		loss = fitted0[2][1]
+		local_λ_serial, hh_serial, fitted0_serial = test_fit_perfect(l_test, 0)
+		fitted_line_serial = fitted0_serial[1]
+		loss_serial = fitted0_serial[2][1]
 
-		push!(λ_to_plot, local_λ)
-		push!(hh_to_plot, hh)
+		push!(λ_to_plot_serial, local_λ_serial)
+		push!(hh_to_plot_serial, hh_serial)
 
-		push!(fitted_lines, fitted_line)
-		push!(fitted_losses, loss)
-		push!(fitted_to_plot, fitted0[1](local_λ))
-		
+		push!(fitted_lines_serial, fitted_line_serial)
+		push!(fitted_losses_serial, loss_serial)
+		push!(fitted_to_plot_serial, fitted0_serial[1](local_λ_serial))
+
+
+		local_λ_parallel, hh_parallel, fitted0_parallel = test_fit_perfect(l_test, 1)
+		fitted_line_parallel = fitted0_parallel[1]
+		loss_parallel = fitted0_parallel[2][1]
+
+		push!(λ_to_plot_parallel, local_λ_parallel)
+		push!(hh_to_plot_parallel, hh_parallel)
+
+		push!(fitted_lines_parallel, fitted_line_parallel)
+		push!(fitted_losses_parallel, loss_parallel)
+		push!(fitted_to_plot_parallel, fitted0_parallel[1](local_λ_parallel))
 	end
 end
 
@@ -111,15 +130,18 @@ end
 begin
 
 	
-	local plt = plot(legend = :topleft)
-	plot!(plt,λ_to_plot[1],hh_to_plot[1], label="Art. \'Perfect\' 1",color=:grey)
-	plot!(plt,λ_to_plot[1],fitted_to_plot[1],label="Serial 1")
+	local plt = plot(legend = :bottomleft)
+	plot!(plt,λ_to_plot_serial[1],hh_to_plot_serial[1], label="Art. \'Perfect\' 1",color=:red)
+	plot!(plt,λ_to_plot_serial[1],fitted_to_plot_serial[1],label="Serial 1",color=:red)
+	plot!(plt,λ_to_plot_parallel[1],fitted_to_plot_parallel[1],label="Parallel 1",color=:red)
 
-	plot!(plt,λ_to_plot[2],hh_to_plot[2], label="Art. \'Perfect\' 2",color=:grey)
-	plot!(plt,λ_to_plot[2],fitted_to_plot[2],label="Serial 2")
+	plot!(plt,λ_to_plot_serial[2],hh_to_plot_serial[2], label="Art. \'Perfect\' 2",color=:green)
+	plot!(plt,λ_to_plot_serial[2],fitted_to_plot_serial[2],label="Serial 2",color=:green)
+	plot!(plt,λ_to_plot_parallel[2],fitted_to_plot_parallel[2],label="Parallel 2",color=:green)
 
-	plot!(plt,λ_to_plot[3],hh_to_plot[3], label="Art. \'Perfect\' 3",color=:grey)
-	plot!(plt,λ_to_plot[3],fitted_to_plot[3],label="Serial 3")
+	plot!(plt,λ_to_plot_serial[3],hh_to_plot_serial[3], label="Art. \'Perfect\' 3",color=:blue)
+	plot!(plt,λ_to_plot_serial[3],fitted_to_plot_serial[3],label="Serial 3",color=:blue)
+	plot!(plt,λ_to_plot_parallel[3],fitted_to_plot_parallel[3],label="Parallel 3",color=:blue)
 end
 
 # ╔═╡ 816cbbba-fc63-43f8-a407-5175c23105ad
@@ -130,23 +152,46 @@ md"### Displaying the fitted wavelength and loss of each fitted line"
 
 # ╔═╡ b0743a59-749c-4981-b7d8-aebaf306cd21
 begin
-	found_λs = []
-	losses = fitted_losses
-	for i in 1:length(fitted_lines)
-		line = fitted_lines[i].lines[1]
+	found_lines_serial = []
+	found_λs_serial = []
+	
+	found_lines_parallel = []
+	found_λs_parallel = []
+	
+	losses_serial = fitted_losses_serial
+	losses_parallel = fitted_losses_parallel
+	for i in 1:length(fitted_lines_serial)
+		line_serial = fitted_lines_serial[i].lines[1]
+		line_parallel = fitted_lines_parallel[i].lines[1]
 		
-		push!(found_λs, line.λ)
+		push!(found_lines_serial, line_serial)
+		push!(found_lines_parallel, line_parallel)
+		
+		push!(found_λs_serial, line_serial.λ)
+		push!(found_λs_parallel, line_parallel.λ)
 	end
 end
+
+# ╔═╡ 8b6c1821-583f-433a-86aa-ef6f4b962aa0
+md"##### The exact same fits are found by both serial and parallel (TEST A)"
+
+# ╔═╡ 284499fc-fb4c-4467-a411-fb931da8f1a0
+@test found_lines_parallel == found_lines_serial
+
+# ╔═╡ a6a8c638-7568-4b3f-bca0-5eaf4e6f6538
+md"##### Showing same losses found for both serial and parallel"
+
+# ╔═╡ 831dd93c-f6ab-4f70-9402-ccf60af85b48
+@test losses_serial == losses_parallel
 
 # ╔═╡ e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
 md"##### Showing loss is negligible for all fits (TEST B)"
 
 # ╔═╡ 542dd888-3cbb-44c0-a454-15fd69e3cd54
-@test maximum(losses) < 1E-5
+@test maximum(losses_serial) < 1E-5 && maximum(losses_parallel) < 1E-5
 
 # ╔═╡ 6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
-if maximum(losses) < 1E-5
+if maximum(losses_serial) < 1E-5
 	with_terminal() do
 		println("Loss is negligible for all fits!")
 	end
@@ -157,13 +202,13 @@ end
 md"##### Comparing fitted wavelength to original (TEST C)"
 
 # ╔═╡ 7c241d15-4d68-499a-853b-6e2ebb07280c
-@test maximum(broadcast(abs, found_λs.-art_λs)) < 1e-13
+@test maximum(broadcast(abs, found_λs_serial.-art_λs)) < 1e-13
 
 # ╔═╡ 84cc7ad5-6fd4-47df-8bff-dd803e03aa21
 begin
 	
 	
-	if (maximum(broadcast(abs, found_λs.-art_λs)) < 1E-13)
+	if (maximum(broadcast(abs, found_λs_serial.-art_λs)) < 1E-13)
 		with_terminal() do
 			println("The function found all of the artifically fed in wavelengths perfectly!")
 		end
@@ -189,21 +234,41 @@ begin
 	fitted_losses_del = []
 	fitted_to_plot_del = []
 	
+
+	λ_to_plot_del_parallel = []
+	hh_to_plot_del_parallel = []
+		
+	fitted_lines_del_parallel = []
+	fitted_losses_del_parallel = []
+	fitted_to_plot_del_parallel = []
 	
 	
 
 	for i in 1:length(vert_λs)
-		local_λ, hh, fitted0 = test_serial_fit_delta(vert_λs[i])
+		local_λ, hh, fitted_serial, fitted_parallel = test_fit_delta(vert_λs[i])
 		
-		fitted_line = fitted0[1]
-		loss = fitted0[2][1]
+		fitted_line = fitted_serial[1]
+		loss = fitted_serial[2][1]
 
 		push!(λ_to_plot_del, local_λ)
 		push!(hh_to_plot_del, hh)
 
 		push!(fitted_lines_del, fitted_line)
 		push!(fitted_losses_del, loss)
-		push!(fitted_to_plot_del, fitted0[1](local_λ))
+		push!(fitted_to_plot_del, fitted_serial[1](local_λ))
+
+
+		
+		
+		fitted_line_parallel = fitted_parallel[1]
+		loss_parallel = fitted_parallel[2][1]
+
+		push!(λ_to_plot_del_parallel, local_λ)
+		push!(hh_to_plot_del_parallel, hh)
+
+		push!(fitted_lines_del_parallel, fitted_line_parallel)
+		push!(fitted_losses_del_parallel, loss_parallel)
+		push!(fitted_to_plot_del_parallel, fitted_parallel[1](local_λ))
 		
 	end
 end
@@ -215,12 +280,15 @@ begin
 	local plt = plot(legend = :bottomright)
 	plot!(plt,λ_to_plot_del[1],hh_to_plot_del[1], label="Rect. 1",color=:red)
 	plot!(plt,λ_to_plot_del[1],fitted_to_plot_del[1],label="Serial 1", color=:red)
+	plot!(plt,λ_to_plot_del_parallel[1],fitted_to_plot_del_parallel[1],label="Parallel 1", color=:red)
 
 	plot!(plt,λ_to_plot_del[2],hh_to_plot_del[2], label="Rect. 2",color=:purple)
 	plot!(plt,λ_to_plot_del[2],fitted_to_plot_del[2],label="Serial 2", color=:purple)
+	plot!(plt,λ_to_plot_del_parallel[2],fitted_to_plot_del_parallel[2],label="Parallel 2", color=:green)
 
 	plot!(plt,λ_to_plot_del[3],hh_to_plot_del[3], label="Rect. 3",color=:blue)
 	plot!(plt,λ_to_plot_del[3],fitted_to_plot_del[3],label="Serial 3", color=:blue)
+	plot!(plt,λ_to_plot_del_parallel[3],fitted_to_plot_del_parallel[3],label="Parallel 3", color=:blue)
 
 
 	plot!(plt, [4501.5], [0.00], color=:white, label="")
@@ -233,28 +301,47 @@ md"Now, the artifically injected absorption line looks nothing like a Gauss-Herm
 # ╔═╡ 8cdf9c9e-a911-4b26-96dc-7c696a23f513
 begin
 	found_λs_del = []
+	found_λs_del_parallel = []
+	
 	losses_del = fitted_losses_del
+	losses_del_parallel = fitted_losses_del_parallel
 	for i in 1:length(fitted_lines_del)
 		line_del = fitted_lines_del[i].lines[1]
-		
+		line_del_parallel = fitted_lines_del_parallel[i].lines[1]
+
 		push!(found_λs_del, line_del.λ)
+		push!(found_λs_del_parallel, line_del_parallel.λ)
 	end
 end
+
+# ╔═╡ 69a095ed-8b7a-45df-959a-1dd25424f478
+md"##### Comparing serial and parallel fitting outputs (TEST A)"
+
+# ╔═╡ 41300668-f016-4fa0-859c-0e9e07e0408d
+#checking that both fits evaluated the same value of loss for all three fits
+@test sum(fitted_losses_del .- fitted_losses_del_parallel)/length(fitted_losses_del_parallel) <= 1E-5
+
+# ╔═╡ 75159dcb-d131-414a-9829-b152f01769a3
+#checking that both fits evaluated the same value of λ for all three fits
+@test sum(found_λs_del .- found_λs_del_parallel)/length(found_λs_del_parallel) <= 1E-5
+
+# ╔═╡ 271169f9-8f84-4c3d-a35f-03601e8ab449
+#this checks that all three fits returned the exact same gh coefficients for both serial and parallel
+@test fitted_lines_del[1].lines[1].gh_coeff == fitted_lines_del_parallel[1].lines[1].gh_coeff && fitted_lines_del[2].lines[1].gh_coeff == fitted_lines_del_parallel[2].lines[1].gh_coeff && fitted_lines_del[3].lines[1].gh_coeff == fitted_lines_del_parallel[3].lines[1].gh_coeff
 
 # ╔═╡ e6271caf-fc37-453a-a6e6-55cf3020bed5
 md"##### Checking if the largest loss value is small (TEST B)"
 
 # ╔═╡ 1364e832-ff49-42ad-b559-3f1ce13fefa9
+#for the rectangular fits, this test should fail
 @test maximum(losses_del) < 1E-5
 
 # ╔═╡ ef3b5bd3-3022-473b-a3f3-745d11089c6d
 md"##### Checking if the center of each line is found properly (TEST C)"
 
 # ╔═╡ b4ad1397-72e0-4760-a3f4-b36270031539
-@test maximum(broadcast(abs, found_λs.-art_λs)) < 1e-13
-
-# ╔═╡ 61715fc8-b1df-43ee-bf81-f40ef98ccd36
-md"So it seems the algorithm still finds the injected center each time, even though that creates a significantly large loss function. This is not unexpected because the rectangular absorption line is still symmetric about that center, and a Gauss-Hermite fit finds that readily."
+#this test should also fail-the algorithm may not find the correct central wavelength, because the injected rectangular absorption line's dip is not symmetric about the central wavelength
+@test maximum(broadcast(abs, found_λs_del.-vert_λs)) < 1e-13
 
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
@@ -265,6 +352,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
+FLoops = "cc61a311-1640-44b5-9fba-1b764f453329"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 Gumbo = "708ec375-b3d6-5a57-a7ce-8257bf98657a"
@@ -289,6 +377,7 @@ ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 BenchmarkTools = "~1.2.0"
 DataFrames = "~1.2.2"
 FITSIO = "~0.16.9"
+FLoops = "~0.1.11"
 FillArrays = "~0.12.6"
 FlameGraphs = "~0.2.6"
 Gumbo = "~0.8.0"
@@ -433,6 +522,12 @@ git-tree-sha1 = "f74e9d5388b8620b4cee35d4c5a618dd4dc547f4"
 uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 version = "1.3.0"
 
+[[ContextVariablesX]]
+deps = ["Compat", "Logging", "UUIDs"]
+git-tree-sha1 = "8ccaa8c655bc1b83d2da4d569c9b28254ababd6e"
+uuid = "6add18c4-b38d-439d-96f6-d6bc489c04c5"
+version = "0.1.2"
+
 [[Contour]]
 deps = ["StaticArrays"]
 git-tree-sha1 = "9f02045d934dc030edad45944ea80dbd1f0ebea7"
@@ -533,6 +628,18 @@ deps = ["CFITSIO", "Printf", "Reexport", "Tables"]
 git-tree-sha1 = "ba5eb4020e474b1c1d4952f91dd7bbfb97b5bf98"
 uuid = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 version = "0.16.9"
+
+[[FLoops]]
+deps = ["Compat", "FLoopsBase", "JuliaVariables", "MLStyle", "Serialization", "Setfield", "Transducers"]
+git-tree-sha1 = "7cb2eb7e5d824885a4d5e0a7870660c01ac394c2"
+uuid = "cc61a311-1640-44b5-9fba-1b764f453329"
+version = "0.1.11"
+
+[[FLoopsBase]]
+deps = ["ContextVariablesX"]
+git-tree-sha1 = "cf3d8b2527be12d204d06aba922b30339a9653dd"
+uuid = "b9860ae5-e623-471e-878b-f6a53c775ea6"
+version = "0.1.0"
 
 [[FastGaussQuadrature]]
 deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
@@ -744,6 +851,12 @@ git-tree-sha1 = "d735490ac75c5cb9f1b00d8b5509c11984dc6943"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.0+0"
 
+[[JuliaVariables]]
+deps = ["MLStyle", "NameResolution"]
+git-tree-sha1 = "49fb3cb53362ddadb4415e9b73926d6b40709e70"
+uuid = "b14d175d-62b4-44ba-8fb7-3064adc8c3ec"
+version = "0.2.4"
+
 [[LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
@@ -863,6 +976,11 @@ version = "0.3.3"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
+[[MLStyle]]
+git-tree-sha1 = "594e189325f66e23a8818e5beb11c43bb0141bcd"
+uuid = "d8e11817-5142-5d16-987a-aa16d5891078"
+version = "0.4.10"
+
 [[MacroTools]]
 deps = ["Markdown", "Random"]
 git-tree-sha1 = "5a5bc6bf062f0f95e62d0fe0a2d99699fed82dd9"
@@ -934,6 +1052,12 @@ version = "0.2.20"
 git-tree-sha1 = "bfe47e760d60b82b66b61d2d44128b62e3a369fb"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "0.3.5"
+
+[[NameResolution]]
+deps = ["PrettyPrint"]
+git-tree-sha1 = "1a0fa0e9613f46c9b8c11eee38ebb4f590013c5e"
+uuid = "71a1bf82-56d0-4bbc-8a3c-48b961074391"
+version = "0.1.5"
 
 [[NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
@@ -1052,6 +1176,11 @@ deps = ["TOML"]
 git-tree-sha1 = "00cfd92944ca9c760982747e9a1d0d5d86ab1e5a"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.2.2"
+
+[[PrettyPrint]]
+git-tree-sha1 = "632eb4abab3449ab30c5e1afaa874f0b98b586e4"
+uuid = "8162dcfd-2161-5ef2-ae6c-7681170c5f98"
+version = "0.2.0"
 
 [[PrettyTables]]
 deps = ["Crayons", "Formatting", "Markdown", "Reexport", "Tables"]
@@ -1493,9 +1622,13 @@ version = "0.9.1+5"
 # ╟─816cbbba-fc63-43f8-a407-5175c23105ad
 # ╟─a9a6e260-e598-450b-b328-416c6f50c78b
 # ╠═b0743a59-749c-4981-b7d8-aebaf306cd21
-# ╠═e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
+# ╟─8b6c1821-583f-433a-86aa-ef6f4b962aa0
+# ╠═284499fc-fb4c-4467-a411-fb931da8f1a0
+# ╟─a6a8c638-7568-4b3f-bca0-5eaf4e6f6538
+# ╠═831dd93c-f6ab-4f70-9402-ccf60af85b48
+# ╟─e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
 # ╠═542dd888-3cbb-44c0-a454-15fd69e3cd54
-# ╠═6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
+# ╟─6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
 # ╟─ea74ade9-3748-4ef6-9754-eb83353bdd07
 # ╠═7c241d15-4d68-499a-853b-6e2ebb07280c
 # ╟─84cc7ad5-6fd4-47df-8bff-dd803e03aa21
@@ -1505,11 +1638,14 @@ version = "0.9.1+5"
 # ╠═b2a80990-7d38-4694-9c24-626053d9a28d
 # ╟─dbf30428-7d5a-410f-9a42-c63befaec7b8
 # ╠═8cdf9c9e-a911-4b26-96dc-7c696a23f513
+# ╟─69a095ed-8b7a-45df-959a-1dd25424f478
+# ╠═41300668-f016-4fa0-859c-0e9e07e0408d
+# ╠═75159dcb-d131-414a-9829-b152f01769a3
+# ╠═271169f9-8f84-4c3d-a35f-03601e8ab449
 # ╟─e6271caf-fc37-453a-a6e6-55cf3020bed5
 # ╠═1364e832-ff49-42ad-b559-3f1ce13fefa9
 # ╟─ef3b5bd3-3022-473b-a3f3-745d11089c6d
 # ╠═b4ad1397-72e0-4760-a3f4-b36270031539
-# ╟─61715fc8-b1df-43ee-bf81-f40ef98ccd36
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═aed1a891-a5bb-469b-9771-43cb0945d214

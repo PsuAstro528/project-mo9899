@@ -9,6 +9,7 @@ using DataFrames
 using LazyArrays, StructArrays
 using SpecialPolynomials
 using LinearAlgebra, PDMats
+using FLoops
 
 
 
@@ -211,7 +212,162 @@ function fit_lines_v0_serial(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = 
 	
 end;
 
+
 function fit_lines_v0_parallel(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
+			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
+			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
+	
+	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+	
+	@assert size(λ) == size(flux) == size(var)
+	n_pix = length(λ)
+	n_lines = length(λ_lines)
+	n = length(λ)
+	@assert n_lines >= 1 
+	@assert 1 <= order <= 10 #10 is the number of gh_polynomials I have computed in the global scope. The code cannot handle more than these many (although we will seldom go beyond 4 orders)
+	@assert n_pix > 1 + order*n_lines  # number of fit parameters
+	covar = PDiagMat(var)   # diagonal covariance matrix
+	design_matrix = ones(n_pix,1)
+	
+	fitted_lines = []
+	fitted_losses = []
+	for i in 1:n_lines
+		λ_line = λ_lines[i]
+		σ_line = 0.04
+		#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
+		lowest_idx = closest_index(λ, λ_line-fit_devs*σ_line)
+		highest_idx = closest_index(λ, λ_line+fit_devs*σ_line)
+		
+		losses = zeros(highest_idx-lowest_idx+1)
+		line_tries = []
+		for j = lowest_idx:highest_idx
+			λ_to_fit = λ[j]
+
+			line = AbsorptionLine(λ_to_fit, σ_line,(@SVector zeros(order)) ) #create a line data-structure 
+			
+			design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
+			Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
+			X_inv_covar_y =   design_matrix' * (covar \ flux ) 
+			coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
+			
+			
+			line = AbsorptionLine(λ_to_fit, σ_line, coeff_hat[2:end] )
+			
+			push!(line_tries, line)
+			#line_tries.append(line)
+			#calculating loss for this fit
+			lowest_loss_idx = closest_index(λ, λ_line-loss_devs*σ_line)
+			highest_loss_idx = closest_index(λ, λ_line+loss_devs*σ_line)
+			loss = 0.0
+			Threads.@threads for k = lowest_loss_idx:highest_loss_idx
+				loss+=abs(flux[k]-line.(λ[k]))
+			end
+			losses[j-lowest_idx+1] = loss
+		end
+		
+		#find fit with lowest loss
+		best_fit_loss, best_fit_idx = findmin(losses)
+		best_fit_λ = λ[best_fit_idx]
+		best_fit_line = line_tries[best_fit_idx]
+		
+		push!(fitted_lines, best_fit_line)
+		push!(fitted_losses, best_fit_loss)
+	end
+	return SpectrumModel(1,fitted_lines), fitted_losses
+	
+end;
+
+
+function fit_lines_v0_parallel_experimental(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
+			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
+			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
+	
+	#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+	
+	@assert size(λ) == size(flux) == size(var)
+	n_pix = length(λ)
+	n_lines = length(λ_lines)
+	n = length(λ)
+	@assert n_lines >= 1 
+	@assert 1 <= order <= 10 #10 is the number of gh_polynomials I have computed in the global scope. The code cannot handle more than these many (although we will seldom go beyond 4 orders)
+	@assert n_pix > 1 + order*n_lines  # number of fit parameters
+	covar = PDiagMat(var)   # diagonal covariance matrix
+	design_matrix = ones(n_pix,1)
+	
+	fitted_lines = []
+	fitted_losses = []
+	for i in 1:n_lines
+		λ_line = λ_lines[i]
+		σ_line = 0.04
+		#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
+		lowest_idx = closest_index(λ, λ_line-fit_devs*σ_line)
+		highest_idx = closest_index(λ, λ_line+fit_devs*σ_line)
+		
+		losses = zeros(highest_idx-lowest_idx+1)
+		line_tries = []
+		smallest_loss = 999999
+		best_fit_idx = -1
+		for j = lowest_idx:highest_idx
+
+			line = AbsorptionLine(λ[j], σ_line,(@SVector zeros(order)) ) #create a line data-structure 
+			
+			design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
+			Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
+			X_inv_covar_y =   design_matrix' * (covar \ flux ) 
+			coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
+			
+			
+			line = AbsorptionLine(λ[j], σ_line, coeff_hat[2:end] )
+			
+			
+			
+			#calculating loss for this fit
+			lowest_loss_idx = closest_index(λ, λ_line+(-1*loss_devs*σ_line))
+			highest_loss_idx = closest_index(λ, λ_line+loss_devs*σ_line)
+			
+			loss = 0.0
+			#for k = lowest_loss_idx:highest_loss_idx
+			#	loss+=abs(flux[k]-line.(λ[k]))
+			#end
+			
+			
+			flux_red = flux[lowest_loss_idx:highest_loss_idx]
+			
+			#var_red = var[lowest_loss_idx:highest_loss_idx]
+			#chi_sq = sum(((flux_red.-line.(λ_red)).^2)./var_red)
+			line_red = line.(λ[lowest_loss_idx:highest_loss_idx])
+			
+			@floop ThreadedEx() for k in eachindex(flux_red)
+				@reduce(loss += abs(flux_red[k]-line_red[k]))
+			end
+			
+			if loss < smallest_loss
+				smallest_loss = loss
+				push!(line_tries, line)
+				push!(losses, loss)
+				best_fit_idx = j
+			end
+			
+			#losses[j-lowest_idx+1] = loss
+			
+		end
+		
+		#find fit with lowest loss
+		best_fit_loss = losses[length(losses)]
+		
+		#best_fit_loss, best_fit_idx = findmin(losses)
+		
+		best_fit_λ = λ[best_fit_idx]
+		best_fit_line = line_tries[length(line_tries)]
+		
+		push!(fitted_lines, best_fit_line)
+		push!(fitted_losses, best_fit_loss)
+	end
+	return SpectrumModel(1,fitted_lines), fitted_losses
+	
+end;
+
+function fit_lines_v0_parallel_old(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
 			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 	
@@ -274,8 +430,10 @@ end;
 
 #Testing 
 
-function test_serial_fit_perfect(artificial_line::AbsorptionLine )
+function test_fit_perfect(artificial_line::AbsorptionLine, s_or_p::Integer)
 			  
+	#s_or_p = 0 if it should be a serial test and s_or_p = 1 if a parallel test
+	@assert s_or_p == 0 || s_or_p == 1
 	#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
 	
 	
@@ -283,6 +441,7 @@ function test_serial_fit_perfect(artificial_line::AbsorptionLine )
 	#creating an artificial line and calculating the fluxes of that line at a local window of lambdas near the wavelength of the artificial line
 	#λ_line = λ_lines[i]
 		#σ_line = 0.04
+	
 	
 	artificial_λ = artificial_line.λ
 	artificial_σ = artificial_line.σ
@@ -318,7 +477,13 @@ function test_serial_fit_perfect(artificial_line::AbsorptionLine )
 	
 	λ_lines = [artificial_λ]
 	vars = ones(length(hh)).*artificial_σ
-	fitted0 = fit_lines_v0_serial(λ_lines,local_λ,hh, vars, order = 4)
+	if s_or_p == 0
+	
+		fitted0 = fit_lines_v0_serial(λ_lines,local_λ,hh, vars, order = 4)
+	elseif s_or_p == 1
+		#fitted0 = fit_lines_v0_parallel(λ_lines,local_λ,hh, vars, order = 4)
+		fitted0 = fit_lines_v0_parallel_experimental(λ_lines,local_λ,hh, vars, order = 4)
+	end
 	
 	
 
@@ -328,7 +493,9 @@ function test_serial_fit_perfect(artificial_line::AbsorptionLine )
 
 
 
-function test_serial_fit_delta(wavelength::T1) where{T1<:Number}
+
+
+function test_fit_delta(wavelength::T1) where{T1<:Number}
 			  
 	#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
 	
@@ -363,10 +530,14 @@ function test_serial_fit_delta(wavelength::T1) where{T1<:Number}
 	
 	λ_lines = [artificial_λ]
 	vars = ones(length(hh)).*artificial_σ
-	fitted0 = fit_lines_v0_serial(λ_lines,local_λ,hh, vars, order = 4)
+	
+	fitted_serial = fit_lines_v0_serial(λ_lines,local_λ,hh, vars, order = 4)
+	fitted_parallel = fit_lines_v0_parallel_experimental(λ_lines,local_λ,hh, vars, order = 4)
+	
+	
 	
 	
 
-	return [local_λ, hh, fitted0 ]
+	return [local_λ, hh, fitted_serial, fitted_parallel ]
 
 	end;
