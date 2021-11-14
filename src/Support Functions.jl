@@ -274,7 +274,7 @@ end;
 
 #Testing 
 
-function test_serial_fit(artificial_line::AbsorptionLine )
+function test_serial_fit_perfect(artificial_line::AbsorptionLine )
 			  
 	#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
 	
@@ -312,6 +312,51 @@ function test_serial_fit(artificial_line::AbsorptionLine )
 	g = exp.(-0.5.*x.^2)
 	#ones(λ) .+ sum(g.*p)
 	hh = ones(length(local_λ)).+ g.*pp
+	
+	
+	#fitting to the artificial line
+	
+	λ_lines = [artificial_λ]
+	vars = ones(length(hh)).*artificial_σ
+	fitted0 = fit_lines_v0_serial(λ_lines,local_λ,hh, vars, order = 4)
+	
+	
+
+	return [local_λ, hh, fitted0 ]
+
+	end;
+
+
+
+function test_serial_fit_delta(wavelength::T1) where{T1<:Number}
+			  
+	#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
+	
+	
+	
+	#creating an artificial line and calculating the fluxes of that line at a local window of lambdas near the wavelength of the artificial line
+	#λ_line = λ_lines[i]
+		#σ_line = 0.04
+	
+	artificial_λ = wavelength
+	artificial_σ = 0.04
+	
+	low_λ = artificial_λ-0.2
+	high_λ = artificial_λ+0.2
+	points = 1000
+	local_λ = ones(points)
+	hh = ones(points)
+	left_dip = points * rand()/2
+	right_dip = points/(rand()*2)
+	for i in 1:length(local_λ)
+		local_λ[i] = low_λ + (high_λ-low_λ)/points * i
+
+		if (i > left_dip && i < right_dip)
+			hh[i] = 0.0
+		end
+	end
+	
+	
 	
 	
 	#fitting to the artificial line

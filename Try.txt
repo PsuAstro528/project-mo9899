@@ -18,3 +18,16 @@ end
 	var = var_raw[mask_fit]
 
 
+artificial_λ = 4577.6
+	
+l_test = AbsorptionLine(artificial_λ,artificial_σ,(@SVector [-0.9, -0.5, 0,0]) )
+
+
+
+#test_serial_fit(l_test)[1]
+local_λ, hh, fitted0 = test_serial_fit(l_test)
+fitted_line = fitted0[1]
+loss = fitted0[2]
+local plt = plot()
+plot!(plt,local_λ,hh, label="Artificial Line",color=:grey)
+plot!(plt,local_λ,fitted0[1](local_λ),label="Model")

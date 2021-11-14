@@ -41,61 +41,220 @@ begin
 	Random.seed!(123)
 end;
 
+# ╔═╡ cf223d5f-6377-4df7-a14c-ac8327be571c
+md"""
+# Testing Notebook
+
+###### In this notebook, we will run unit regression tests, where we run the serial and parallel implementations of line fitting in three different cases:
+
+* ###### 1) Artifically created "perfect" lines, that have been created using Gauss-Hermite coefficients, so both implementations should perfectly fit to these lines. 
+
+* ###### 2) Artficially created "terrible" lines. These will be rectangular lines, and the expectation is that both serial and parallel have a very hard time fitting to such  a shape. 
+
+###### In both cases, both serial and parallel should produce the same exact fits (as each other), so we will confirm that both arrive at the same answer. The test [TEST A] will be to chek if parallel and serial come to the same answer. 
+
+###### In case 1, the fits should be close to perfect, so the test [TEST B] will be to check that the loss function is very small. We can also test if the wavelength found by fitting is equal to the artificially created lambda [Test C]
+"""
+
 # ╔═╡ 359c4661-eced-4645-af6e-d862850ab341
-md"# Importing Functions From Local File "
+md"## Importing Functions From Local File "
 
 # ╔═╡ ae332935-fa0e-48c3-986e-54998dd3ce72
 begin
 	funcs = ingredients("./src/Support Functions.jl")
-	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, gauss_hermite_basis_eval, test_serial_fit
+	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, gauss_hermite_basis_eval, test_serial_fit_perfect, test_serial_fit_delta
 end
 
-# ╔═╡ 5f14a35b-63aa-4a31-ab2d-38d84f005e67
-md"""
-# Creating an artificial line with:
-## (λ = 4577.6, σ = 0.04)
+# ╔═╡ df04c127-2e90-4322-b20d-b1620ea11eba
+md"## Perfect Lines"
 
-# And Fitting to it using Serial Implementation
-### This line will be made directly from GH polynomials, so it should have a very very good fit.
-"""
+# ╔═╡ a69a6e2d-3996-4605-ab84-548d49e57d65
+md"### Fitting to several lines and plotting a few of them"
 
 # ╔═╡ a0cdca55-c6db-4f9e-90a3-89704637f62b
 begin
 
-	artificial_λ = 4577.6
+	
+	
 	artificial_σ = 0.04
+	art_λs = [4500, 4500.3, 4500.6, 4500.9, 4501.2, 4501.5, 4501.8, 4502.1, 4502.4]
 	
-	l_test = AbsorptionLine(artificial_λ,artificial_σ,(@SVector [-0.9, -0.5, 0,0]) )
+	λ_to_plot = []
+	hh_to_plot = []
+		
+	fitted_lines = []
+	fitted_losses = []
+	fitted_to_plot = []
 	
-	#test_serial_fit(l_test)[1]
-	local_λ, hh, fitted0 = test_serial_fit(l_test)
-	fitted_line = fitted0[1]
-	loss = fitted0[2]
-	local plt = plot()
-		plot!(plt,local_λ,hh, label="Artificial Line",color=:grey)
-		plot!(plt,local_λ,fitted0[1](local_λ),label="Model")
+
+	for i in 1:length(art_λs)
+		l_test = AbsorptionLine(art_λs[i], artificial_σ, (@SVector [-1*rand()/4, rand()/4, -1*rand()/4,0]))
+	
+	
+		local_λ, hh, fitted0 = test_serial_fit_perfect(l_test)
+		fitted_line = fitted0[1]
+		loss = fitted0[2][1]
+
+		push!(λ_to_plot, local_λ)
+		push!(hh_to_plot, hh)
+
+		push!(fitted_lines, fitted_line)
+		push!(fitted_losses, loss)
+		push!(fitted_to_plot, fitted0[1](local_λ))
+		
+	end
 end
 
 
+
+# ╔═╡ 5b6ee993-a3b4-421c-9491-74d97bb1c8b7
+begin
+
+	
+	local plt = plot(legend = :topleft)
+	plot!(plt,λ_to_plot[1],hh_to_plot[1], label="Art. \'Perfect\' 1",color=:grey)
+	plot!(plt,λ_to_plot[1],fitted_to_plot[1],label="Serial 1")
+
+	plot!(plt,λ_to_plot[2],hh_to_plot[2], label="Art. \'Perfect\' 2",color=:grey)
+	plot!(plt,λ_to_plot[2],fitted_to_plot[2],label="Serial 2")
+
+	plot!(plt,λ_to_plot[3],hh_to_plot[3], label="Art. \'Perfect\' 3",color=:grey)
+	plot!(plt,λ_to_plot[3],fitted_to_plot[3],label="Serial 3")
+end
+
+# ╔═╡ 816cbbba-fc63-43f8-a407-5175c23105ad
+md" As you can see, when the artifically injected spectral line is a Gauss-Hermite function, the model finds it perfectly, and we cannot distinguish the model from the injected line. Let us run tests to show this is true."
 
 # ╔═╡ a9a6e260-e598-450b-b328-416c6f50c78b
-md"# Printing the found wavelength, variance, and loss of fitted line"
+md"### Displaying the fitted wavelength and loss of each fitted line"
 
-# ╔═╡ 09a6cf58-1b0f-499a-a996-3ffa88533290
-with_terminal() do
-	print("Fitted line found: λ_eval = ")
-	print(fitted_line.lines[1].λ)
-	print(" and σ = ")
-	print(fitted_line.lines[1].σ)
-	print("\nWith loss = ")
-	print(loss[1])
+# ╔═╡ b0743a59-749c-4981-b7d8-aebaf306cd21
+begin
+	found_λs = []
+	losses = fitted_losses
+	for i in 1:length(fitted_lines)
+		line = fitted_lines[i].lines[1]
+		
+		push!(found_λs, line.λ)
+	end
 end
 
-# ╔═╡ f9c70ece-8fe3-4b04-9ce6-19aaa3be7e1c
-md"## Confirming loss is small, and fit is good"
+# ╔═╡ e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
+md"##### Showing loss is negligible for all fits (TEST B)"
 
-# ╔═╡ ca4df830-5f70-40e9-b11c-cdc4cbc928ce
-@test loss[1] < 1.0e-5
+# ╔═╡ 542dd888-3cbb-44c0-a454-15fd69e3cd54
+@test maximum(losses) < 1E-5
+
+# ╔═╡ 6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
+if maximum(losses) < 1E-5
+	with_terminal() do
+		println("Loss is negligible for all fits!")
+	end
+end
+
+
+# ╔═╡ ea74ade9-3748-4ef6-9754-eb83353bdd07
+md"##### Comparing fitted wavelength to original (TEST C)"
+
+# ╔═╡ 7c241d15-4d68-499a-853b-6e2ebb07280c
+@test maximum(broadcast(abs, found_λs.-art_λs)) < 1e-13
+
+# ╔═╡ 84cc7ad5-6fd4-47df-8bff-dd803e03aa21
+begin
+	
+	
+	if (maximum(broadcast(abs, found_λs.-art_λs)) < 1E-13)
+		with_terminal() do
+			println("The function found all of the artifically fed in wavelengths perfectly!")
+		end
+	end
+end
+
+# ╔═╡ 6c75616e-cf3a-495a-a78f-4218d2f83f55
+md"## Terrible Lines"
+
+# ╔═╡ ff4aaf0a-9a47-4824-831b-2b9724b223ee
+md"### Creating several artificial lines and fitting to them."
+
+# ╔═╡ 1eff6760-e7dd-4e9d-80cc-583ea7c3c812
+begin
+
+	
+	vert_λs = [4500, 4500.5, 4501]
+	
+	λ_to_plot_del = []
+	hh_to_plot_del = []
+		
+	fitted_lines_del = []
+	fitted_losses_del = []
+	fitted_to_plot_del = []
+	
+	
+	
+
+	for i in 1:length(vert_λs)
+		local_λ, hh, fitted0 = test_serial_fit_delta(vert_λs[i])
+		
+		fitted_line = fitted0[1]
+		loss = fitted0[2][1]
+
+		push!(λ_to_plot_del, local_λ)
+		push!(hh_to_plot_del, hh)
+
+		push!(fitted_lines_del, fitted_line)
+		push!(fitted_losses_del, loss)
+		push!(fitted_to_plot_del, fitted0[1](local_λ))
+		
+	end
+end
+
+# ╔═╡ b2a80990-7d38-4694-9c24-626053d9a28d
+begin
+
+	
+	local plt = plot(legend = :bottomright)
+	plot!(plt,λ_to_plot_del[1],hh_to_plot_del[1], label="Rect. 1",color=:red)
+	plot!(plt,λ_to_plot_del[1],fitted_to_plot_del[1],label="Serial 1", color=:red)
+
+	plot!(plt,λ_to_plot_del[2],hh_to_plot_del[2], label="Rect. 2",color=:purple)
+	plot!(plt,λ_to_plot_del[2],fitted_to_plot_del[2],label="Serial 2", color=:purple)
+
+	plot!(plt,λ_to_plot_del[3],hh_to_plot_del[3], label="Rect. 3",color=:blue)
+	plot!(plt,λ_to_plot_del[3],fitted_to_plot_del[3],label="Serial 3", color=:blue)
+
+
+	plot!(plt, [4501.5], [0.00], color=:white, label="")
+
+end
+
+# ╔═╡ dbf30428-7d5a-410f-9a42-c63befaec7b8
+md"Now, the artifically injected absorption line looks nothing like a Gauss-Hermite function and the fit cannot find it properly. We can see the modeled value is quite different from the injected value. Let us check this using test cases:"
+
+# ╔═╡ 8cdf9c9e-a911-4b26-96dc-7c696a23f513
+begin
+	found_λs_del = []
+	losses_del = fitted_losses_del
+	for i in 1:length(fitted_lines_del)
+		line_del = fitted_lines_del[i].lines[1]
+		
+		push!(found_λs_del, line_del.λ)
+	end
+end
+
+# ╔═╡ e6271caf-fc37-453a-a6e6-55cf3020bed5
+md"##### Checking if the largest loss value is small (TEST B)"
+
+# ╔═╡ 1364e832-ff49-42ad-b559-3f1ce13fefa9
+@test maximum(losses_del) < 1E-5
+
+# ╔═╡ ef3b5bd3-3022-473b-a3f3-745d11089c6d
+md"##### Checking if the center of each line is found properly (TEST C)"
+
+# ╔═╡ b4ad1397-72e0-4760-a3f4-b36270031539
+@test maximum(broadcast(abs, found_λs.-art_λs)) < 1e-13
+
+# ╔═╡ 61715fc8-b1df-43ee-bf81-f40ef98ccd36
+md"So it seems the algorithm still finds the injected center each time, even though that creates a significantly large loss function. This is not unexpected because the rectangular absorption line is still symmetric about that center, and a Gauss-Hermite fit finds that readily."
 
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
@@ -1324,14 +1483,33 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
+# ╟─cf223d5f-6377-4df7-a14c-ac8327be571c
 # ╟─359c4661-eced-4645-af6e-d862850ab341
 # ╠═ae332935-fa0e-48c3-986e-54998dd3ce72
-# ╟─5f14a35b-63aa-4a31-ab2d-38d84f005e67
+# ╟─df04c127-2e90-4322-b20d-b1620ea11eba
+# ╟─a69a6e2d-3996-4605-ab84-548d49e57d65
 # ╠═a0cdca55-c6db-4f9e-90a3-89704637f62b
+# ╠═5b6ee993-a3b4-421c-9491-74d97bb1c8b7
+# ╟─816cbbba-fc63-43f8-a407-5175c23105ad
 # ╟─a9a6e260-e598-450b-b328-416c6f50c78b
-# ╟─09a6cf58-1b0f-499a-a996-3ffa88533290
-# ╟─f9c70ece-8fe3-4b04-9ce6-19aaa3be7e1c
-# ╠═ca4df830-5f70-40e9-b11c-cdc4cbc928ce
+# ╠═b0743a59-749c-4981-b7d8-aebaf306cd21
+# ╠═e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
+# ╠═542dd888-3cbb-44c0-a454-15fd69e3cd54
+# ╠═6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
+# ╟─ea74ade9-3748-4ef6-9754-eb83353bdd07
+# ╠═7c241d15-4d68-499a-853b-6e2ebb07280c
+# ╟─84cc7ad5-6fd4-47df-8bff-dd803e03aa21
+# ╟─6c75616e-cf3a-495a-a78f-4218d2f83f55
+# ╟─ff4aaf0a-9a47-4824-831b-2b9724b223ee
+# ╠═1eff6760-e7dd-4e9d-80cc-583ea7c3c812
+# ╠═b2a80990-7d38-4694-9c24-626053d9a28d
+# ╟─dbf30428-7d5a-410f-9a42-c63befaec7b8
+# ╠═8cdf9c9e-a911-4b26-96dc-7c696a23f513
+# ╟─e6271caf-fc37-453a-a6e6-55cf3020bed5
+# ╠═1364e832-ff49-42ad-b559-3f1ce13fefa9
+# ╟─ef3b5bd3-3022-473b-a3f3-745d11089c6d
+# ╠═b4ad1397-72e0-4760-a3f4-b36270031539
+# ╟─61715fc8-b1df-43ee-bf81-f40ef98ccd36
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═aed1a891-a5bb-469b-9771-43cb0945d214
