@@ -40,6 +40,10 @@ begin
 	using Random
 	using FLoops
 	Random.seed!(123)
+	using DistributedArrays
+	using Distributions
+	using SharedArrays
+	using Distributed
 end;
 
 # ╔═╡ cf223d5f-6377-4df7-a14c-ac8327be571c
@@ -63,7 +67,7 @@ md"## Importing Functions From Local File "
 # ╔═╡ ae332935-fa0e-48c3-986e-54998dd3ce72
 begin
 	funcs = ingredients("./src/Support Functions.jl")
-	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, gauss_hermite_basis_eval, test_fit_perfect, test_fit_delta
+	import .funcs: fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, gauss_hermite_basis_eval, test_fit_perfect, test_fit_delta, AbsorptionLine
 end
 
 # ╔═╡ df04c127-2e90-4322-b20d-b1620ea11eba
@@ -139,9 +143,10 @@ begin
 	plot!(plt,λ_to_plot_serial[2],fitted_to_plot_serial[2],label="Serial 2",color=:green)
 	plot!(plt,λ_to_plot_parallel[2],fitted_to_plot_parallel[2],label="Parallel 2",color=:green)
 
-	plot!(plt,λ_to_plot_serial[3],hh_to_plot_serial[3], label="Art. \'Perfect\' 3",color=:blue)
-	plot!(plt,λ_to_plot_serial[3],fitted_to_plot_serial[3],label="Serial 3",color=:blue)
-	plot!(plt,λ_to_plot_parallel[3],fitted_to_plot_parallel[3],label="Parallel 3",color=:blue)
+	plot!(plt,λ_to_plot_serial[6],hh_to_plot_serial[6], label="Art. \'Perfect\' 3",color=:blue)
+	plot!(plt,λ_to_plot_serial[6],fitted_to_plot_serial[6],label="Serial 3",color=:blue)
+	plot!(plt,λ_to_plot_parallel[6],fitted_to_plot_parallel[6],label="Parallel 3",color=:blue)
+	
 end
 
 # ╔═╡ 816cbbba-fc63-43f8-a407-5175c23105ad
@@ -175,28 +180,14 @@ end
 # ╔═╡ 8b6c1821-583f-433a-86aa-ef6f4b962aa0
 md"##### The exact same fits are found by both serial and parallel (TEST A)"
 
-# ╔═╡ 284499fc-fb4c-4467-a411-fb931da8f1a0
-@test found_lines_parallel == found_lines_serial
+# ╔═╡ f18035be-69d2-4814-90d1-d3f48ab5f894
+@test maximum(map(norm, fitted_to_plot_parallel.-fitted_to_plot_serial)) < 1E-4 * length(fitted_to_plot_parallel)
 
-# ╔═╡ a6a8c638-7568-4b3f-bca0-5eaf4e6f6538
-md"##### Showing same losses found for both serial and parallel"
+# ╔═╡ 96066397-ea8b-44f7-928d-00e5b9470906
+md"##### Testing that Loss is Small (TEST B)"
 
-# ╔═╡ 831dd93c-f6ab-4f70-9402-ccf60af85b48
-@test losses_serial == losses_parallel
-
-# ╔═╡ e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
-md"##### Showing loss is negligible for all fits (TEST B)"
-
-# ╔═╡ 542dd888-3cbb-44c0-a454-15fd69e3cd54
-@test maximum(losses_serial) < 1E-5 && maximum(losses_parallel) < 1E-5
-
-# ╔═╡ 6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
-if maximum(losses_serial) < 1E-5
-	with_terminal() do
-		println("Loss is negligible for all fits!")
-	end
-end
-
+# ╔═╡ 5910fc8f-5cb9-4287-a93d-dc2adfa9640f
+@test maximum(map(norm, losses_serial.-losses_parallel)) < 1E-4 * length(losses_serial)
 
 # ╔═╡ ea74ade9-3748-4ef6-9754-eb83353bdd07
 md"##### Comparing fitted wavelength to original (TEST C)"
@@ -317,6 +308,9 @@ end
 # ╔═╡ 69a095ed-8b7a-45df-959a-1dd25424f478
 md"##### Comparing serial and parallel fitting outputs (TEST A)"
 
+# ╔═╡ 12f2d597-e4ec-4c66-9aff-b54fea549cd6
+@test maximum(map(norm, fitted_to_plot_del_parallel.-fitted_to_plot_del)) < 5E-5 * length(fitted_to_plot_del_parallel)
+
 # ╔═╡ 41300668-f016-4fa0-859c-0e9e07e0408d
 #checking that both fits evaluated the same value of loss for all three fits
 @test sum(fitted_losses_del .- fitted_losses_del_parallel)/length(fitted_losses_del_parallel) <= 1E-5
@@ -351,6 +345,9 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+DistributedArrays = "aaf54ef3-cdf8-58ed-94cc-d582ad619b94"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
 FLoops = "cc61a311-1640-44b5-9fba-1b764f453329"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
@@ -367,6 +364,7 @@ Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 ProfileSVG = "132c30aa-f267-4189-9183-c8a63c7e05e6"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 SpecialPolynomials = "a25cea48-d430-424a-8ee7-0d3ad3742e9e"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -376,6 +374,8 @@ ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 [compat]
 BenchmarkTools = "~1.2.0"
 DataFrames = "~1.2.2"
+DistributedArrays = "~0.6.6"
+Distributions = "~0.25.29"
 FITSIO = "~0.16.9"
 FLoops = "~0.1.11"
 FillArrays = "~0.12.6"
@@ -574,9 +574,27 @@ version = "0.1.1"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
+[[DensityInterface]]
+deps = ["InverseFunctions", "Test"]
+git-tree-sha1 = "794daf62dce7df839b8ed446fc59c68db4b5182f"
+uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
+version = "0.3.3"
+
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+
+[[DistributedArrays]]
+deps = ["Distributed", "LinearAlgebra", "Primes", "Random", "Serialization", "SparseArrays", "Statistics"]
+git-tree-sha1 = "8b73f8289d73306e3fc04e8622a2db562e01cd07"
+uuid = "aaf54ef3-cdf8-58ed-94cc-d582ad619b94"
+version = "0.6.6"
+
+[[Distributions]]
+deps = ["ChainRulesCore", "DensityInterface", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
+git-tree-sha1 = "cce8159f0fee1281335a04bbf876572e46c921ba"
+uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
+version = "0.25.29"
 
 [[DocStringExtensions]]
 deps = ["LibGit2"]
@@ -812,6 +830,12 @@ deps = ["Dates", "Printf", "RecipesBase", "Serialization", "TimeZones"]
 git-tree-sha1 = "323a38ed1952d30586d0fe03412cde9399d3618b"
 uuid = "d8418881-c3e1-53bb-8760-2df7ec849ed5"
 version = "1.5.0"
+
+[[InverseFunctions]]
+deps = ["Test"]
+git-tree-sha1 = "a7254c0acd8e62f1ac75ad24d5db43f5f19f3c65"
+uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
+version = "0.1.2"
 
 [[InvertedIndices]]
 git-tree-sha1 = "bee5f1ef5bf65df56bdd2e40447590b272a5471f"
@@ -1188,6 +1212,11 @@ git-tree-sha1 = "6330e0c350997f80ed18a9d8d9cb7c7ca4b3a880"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 version = "1.2.0"
 
+[[Primes]]
+git-tree-sha1 = "afccf037da52fa596223e5a0e331ff752e0e845c"
+uuid = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
+version = "0.5.0"
+
 [[Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -1249,6 +1278,18 @@ deps = ["UUIDs"]
 git-tree-sha1 = "4036a3bd08ac7e968e27c203d45f5fff15020621"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.1.3"
+
+[[Rmath]]
+deps = ["Random", "Rmath_jll"]
+git-tree-sha1 = "bf3188feca147ce108c76ad82c2792c57abe7b1f"
+uuid = "79098fc4-a85e-5d69-aa6a-4863f24498fa"
+version = "0.7.0"
+
+[[Rmath_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "68db32dff12bb6127bac73c209881191bf0efbb7"
+uuid = "f50d1b31-88e8-58de-be2c-1cc44531875f"
+version = "0.3.0+0"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -1329,6 +1370,12 @@ deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Missings", "Printf", "Ran
 git-tree-sha1 = "8cbbc098554648c84f79a463c9ff0fd277144b6c"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.33.10"
+
+[[StatsFuns]]
+deps = ["ChainRulesCore", "InverseFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
+git-tree-sha1 = "385ab64e64e79f0cd7cfcf897169b91ebbb2d6c8"
+uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
+version = "0.9.13"
 
 [[StructArrays]]
 deps = ["Adapt", "DataAPI", "StaticArrays", "Tables"]
@@ -1622,13 +1669,10 @@ version = "0.9.1+5"
 # ╟─816cbbba-fc63-43f8-a407-5175c23105ad
 # ╟─a9a6e260-e598-450b-b328-416c6f50c78b
 # ╠═b0743a59-749c-4981-b7d8-aebaf306cd21
-# ╟─8b6c1821-583f-433a-86aa-ef6f4b962aa0
-# ╠═284499fc-fb4c-4467-a411-fb931da8f1a0
-# ╟─a6a8c638-7568-4b3f-bca0-5eaf4e6f6538
-# ╠═831dd93c-f6ab-4f70-9402-ccf60af85b48
-# ╟─e9e7cf0c-02f2-4fc4-a21d-913eb3313bcf
-# ╠═542dd888-3cbb-44c0-a454-15fd69e3cd54
-# ╟─6ff49636-e367-48d2-b8d2-f32e8e1dc2c2
+# ╠═8b6c1821-583f-433a-86aa-ef6f4b962aa0
+# ╠═f18035be-69d2-4814-90d1-d3f48ab5f894
+# ╟─96066397-ea8b-44f7-928d-00e5b9470906
+# ╠═5910fc8f-5cb9-4287-a93d-dc2adfa9640f
 # ╟─ea74ade9-3748-4ef6-9754-eb83353bdd07
 # ╠═7c241d15-4d68-499a-853b-6e2ebb07280c
 # ╟─84cc7ad5-6fd4-47df-8bff-dd803e03aa21
@@ -1639,6 +1683,7 @@ version = "0.9.1+5"
 # ╟─dbf30428-7d5a-410f-9a42-c63befaec7b8
 # ╠═8cdf9c9e-a911-4b26-96dc-7c696a23f513
 # ╟─69a095ed-8b7a-45df-959a-1dd25424f478
+# ╠═12f2d597-e4ec-4c66-9aff-b54fea549cd6
 # ╠═41300668-f016-4fa0-859c-0e9e07e0408d
 # ╠═75159dcb-d131-414a-9829-b152f01769a3
 # ╠═271169f9-8f84-4c3d-a35f-03601e8ab449

@@ -1,34 +1,35 @@
 using StaticArrays
 using Distributed
 using Distributions
+@everywhere Pkg.add("StaticArrays")
+@everywhere using StaticArrays
+@everywhere using SharedArrays
+@everywhere Pkg.add("Polynomials")
+@everywhere using Polynomials
+@everywhere Pkg.add("FillArrays")
+@everywhere using FillArrays
+@everywhere Pkg.add("Statistics")
+@everywhere using Statistics
+@everywhere Pkg.add("ThreadsX")
+@everywhere using ThreadsX
+@everywhere Pkg.add("Gumbo")
+@everywhere using Gumbo
+@everywhere Pkg.add("FITSIO")
+@everywhere using FITSIO
+@everywhere Pkg.add("DataFrames")
+@everywhere using DataFrames
+@everywhere Pkg.add("LazyArrays")
+@everywhere Pkg.add("StructArrays")
+@everywhere using LazyArrays, StructArrays
+@everywhere Pkg.add("SpecialPolynomials")
+@everywhere using SpecialPolynomials
 
-using StaticArrays
-using SharedArrays
+@everywhere Pkg.add("LinearAlgebra")
+@everywhere Pkg.add("PDMats")
+@everywhere using LinearAlgebra, PDMats
 
-using Polynomials
-
-using FillArrays
-
-using Statistics
-
-using ThreadsX
-
-using Gumbo
-
-using FITSIO
-
-using DataFrames
-
-using LazyArrays, StructArrays
-
-using SpecialPolynomials
-
-
-
-using LinearAlgebra, PDMats
-
-
-using FLoops
+@everywhere Pkg.add("FLoops")
+@everywhere using FLoops
 
 
 
@@ -70,13 +71,13 @@ end;
 
 #Absorption Line and GH Parametrization of it
 
-struct AbsorptionLine
+@everywhere struct AbsorptionLine
 		λ::Float64
 		σ::Float64
 		gh_coeff::SVector{4,Float64}  # Statically allocated to reduce memory allocations
 	end;
 
-function (line::AbsorptionLine)(λ)
+@everywhere function (line::AbsorptionLine)(λ)
 		T = typeof(line.λ)
 		gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials 
 		x = (λ.-line.λ)./line.σ
@@ -88,7 +89,7 @@ function (line::AbsorptionLine)(λ)
 		#sum(g.*p)
 	end
 
-function gaussian(line::AbsorptionLine, λ::Number)
+@everywhere function gaussian(line::AbsorptionLine, λ::Number)
 		exp(-((λ-line.λ)/line.σ)^2//2)
 	end
 	
@@ -97,7 +98,7 @@ function gaussian(line::AbsorptionLine, λ::Number)
 gh_polynomials = [basis(Hermite, i)(variable(Polynomial{Float64})) for i in 0:10]
 
 	
-function gauss_hermite_basis(line::AbsorptionLine, λ, order::Integer)
+@everywhere function gauss_hermite_basis(line::AbsorptionLine, λ, order::Integer)
 	@assert 1 <= order+1 <= length(gh_polynomials)
 	T = typeof(line.λ)
 	gh_poly::Polynomial{T,:x} = gh_polynomials[order+1] 
@@ -108,7 +109,7 @@ end
 
 
 
-function gauss_hermite_basis(line::AbsorptionLine, λ; orders::AbstractVector{Int64} = 1:length(line.gh_coeff) )
+@everywhere function gauss_hermite_basis(line::AbsorptionLine, λ; orders::AbstractVector{Int64} = 1:length(line.gh_coeff) )
 	T = typeof(line.λ)
 	gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials
 	x = (λ.-line.λ)./line.σ
@@ -122,12 +123,12 @@ end
 
 #Synthetic Spectrum Definitions
 
-struct SpectrumModel
+@everywhere struct SpectrumModel
 	norm::Float64
 	lines::Vector{AbsorptionLine}
 end
 
-function (model::SpectrumModel)(λ)
+@everywhere function (model::SpectrumModel)(λ)
 	result = fill(model.norm,length(λ))
 	for i in 1:length(model.lines)
 		result .*= model.lines[i].(λ)
@@ -143,7 +144,7 @@ end
 
 
 
-function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
+@everywhere function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
 	#this function finds the index in the array λ of the value that is closest to num_to_find
 	max_val = maximum(λ)
 	min_val = minimum(λ)
@@ -297,7 +298,7 @@ function fit_lines_v0_parallel(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type 
 end;
 
 
-function fit_lines_v0_parallel_experimental(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
+@everywhere function fit_lines_v0_parallel_experimental(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
 			{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 			  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 	
@@ -313,11 +314,10 @@ function fit_lines_v0_parallel_experimental(λ_lines::V1, λ::V3, flux::V4, var:
 	covar = PDiagMat(var)   # diagonal covariance matrix
 	design_matrix = ones(n_pix,1)
 	
-	fitted_lines = []
-	fitted_losses = []
-	
-	#fitted_lines = SharedArray{AbsorptionLine}(n_lines, 1)
-	#fitted_losses = SharedArray{Float64}(n_lines, 1)
+	#fitted_lines = []
+	#fitted_losses = []
+	fitted_lines = SharedArray{AbsorptionLine}(n_lines, 1)
+	fitted_losses = SharedArray{Float64}(n_lines, 1)
 	for i in 1:n_lines
 		λ_line = λ_lines[i]
 		σ_line = 0.04
@@ -381,11 +381,10 @@ function fit_lines_v0_parallel_experimental(λ_lines::V1, λ::V3, flux::V4, var:
 		
 		best_fit_λ = λ[best_fit_idx]
 		best_fit_line = line_tries[length(line_tries)]
-		
-		push!(fitted_lines, best_fit_line)
-		push!(fitted_losses, best_fit_loss)
-		#fitted_lines[i] = best_fit_line
-		#fitted_losses[i] = best_fit_loss
+		fitted_lines[i] = best_fit_line
+		fitted_losses[i] = best_fit_loss
+		#push!(fitted_lines, best_fit_line)
+		#push!(fitted_losses, best_fit_loss)
 	end
 	return SpectrumModel(1,fitted_lines), fitted_losses
 	
@@ -454,7 +453,7 @@ end;
 
 #Testing 
 
-function test_fit_perfect(artificial_line::AbsorptionLine, s_or_p::Integer)
+@everywhere function test_fit_perfect(artificial_line::AbsorptionLine, s_or_p::Integer)
 			  
 	#s_or_p = 0 if it should be a serial test and s_or_p = 1 if a parallel test
 	@assert s_or_p == 0 || s_or_p == 1
