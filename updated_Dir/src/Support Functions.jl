@@ -18,12 +18,14 @@ module SupportFunctions
 	using FLoops
 	using Plots
 
-	export fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, test_fit_perfect, test_fit_delta, fit_lines_v0_parallel_experimental
+	export test, fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, test_fit_perfect, test_fit_delta, fit_lines_v0_parallel_experimental
 
 	#Blaze Function Modeling
 
 
-
+	function test()
+		println("Hello world")
+	end
 
 	struct BlazeModel{T}
 		x_mean::T

@@ -1,29 +1,42 @@
-using Markdown
-using InteractiveUtils
-using FITSIO
-using DataFrames
-using LazyArrays, StructArrays
-using SpecialPolynomials
-using Gumbo
-using ThreadsX
-using Statistics: mean
-using FillArrays
-using StaticArrays
-using Polynomials
-using BenchmarkTools
-using Profile,  ProfileSVG, FlameGraphs
-using Plots # just needed for colorant when color FlameGraphs
-using LinearAlgebra, PDMats # used by periodogram.jl
-using Random
-Random.seed!(123)
-using Distributions
-using SharedArrays
 using Distributed
-using FLoops
+
+@everywhere begin
+	using Pkg
+	#Pkg.UPDATED_REGISTRY_THIS_SESSION[] = true
+	Pkg.activate(".")
+	Pkg.instantiate()
+	#Pkg.precompile()
+end
+
+@everywhere begin
+	using Markdown
+	using InteractiveUtils
+	using FITSIO
+	using DataFrames
+	using LazyArrays, StructArrays
+	using SpecialPolynomials
+	using Gumbo
+	using ThreadsX
+	using Statistics: mean
+	using FillArrays
+	using StaticArrays
+	using Polynomials
+	using BenchmarkTools
+	using Profile,  ProfileSVG, FlameGraphs
+	using Plots # just needed for colorant when color FlameGraphs
+	using LinearAlgebra, PDMats # used by periodogram.jl
+	using Random
+	Random.seed!(123)
+	using Distributions
+	using SharedArrays
+	using FLoops
+	end;
 	
-	
-	
-@everywhere include("./src/Support Functions.jl")
+#addprocs(4)
+
+
+
+include("./src/Support Functions.jl")
 @everywhere using .SupportFunctions
 
 
