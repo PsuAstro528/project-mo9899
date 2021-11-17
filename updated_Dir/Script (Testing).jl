@@ -1,27 +1,38 @@
-using Markdown
-using InteractiveUtils
-using FITSIO
-using DataFrames
-using LazyArrays, StructArrays
-using SpecialPolynomials
-using Gumbo
-using ThreadsX
-using Statistics: mean
-using FillArrays
-using StaticArrays
-using Polynomials
-using BenchmarkTools
-using Profile,  ProfileSVG, FlameGraphs
-using Plots # just needed for colorant when color FlameGraphs
-using LinearAlgebra, PDMats # used by periodogram.jl
-using Random
-using FLoops
-Random.seed!(123)
-using DistributedArrays
-using Distributions
-using SharedArrays
 using Distributed
-using Test
+
+@everywhere begin
+	using Pkg
+	#Pkg.UPDATED_REGISTRY_THIS_SESSION[] = true
+	Pkg.activate(".")
+	#Pkg.instantiate()
+	#Pkg.precompile()
+end
+
+@everywhere begin
+	using Markdown
+	using InteractiveUtils
+	using FITSIO
+	using DataFrames
+	using LazyArrays, StructArrays
+	using SpecialPolynomials
+	using Gumbo
+	using ThreadsX
+	using Statistics: mean
+	using FillArrays
+	using StaticArrays
+	using Polynomials
+	using BenchmarkTools
+	using Profile,  ProfileSVG, FlameGraphs
+	using Plots # just needed for colorant when color FlameGraphs
+	using LinearAlgebra, PDMats # used by periodogram.jl
+	using Random
+	using FLoops
+	Random.seed!(123)
+	using DistributedArrays
+	using Distributions
+	using SharedArrays
+	using Test
+end
 
 
 #Testing Notebook
@@ -41,8 +52,9 @@ using Test
 
 # Perfect Lines Fitting to several lines and plotting a few of them
 
-artificial_σ = 0.04
-art_λs = [4500, 4500.3, 4500.6, 4500.9, 4501.2, 4501.5, 4501.8, 4502.1, 4502.4]
+@everywhere artificial_σ = 0.04
+@everywhere art_λs = [4500, 4500.3, 4500.6, 4500.9, 4501.2, 4501.5, 4501.8, 4502.1, 4502.4]
+
 
 λ_to_plot_serial = []
 hh_to_plot_serial = []
@@ -58,6 +70,7 @@ hh_to_plot_parallel = []
 fitted_lines_parallel = []
 fitted_losses_parallel = []
 fitted_to_plot_parallel = []
+
 
 for i in 1:length(art_λs)
 	l_test = AbsorptionLine(art_λs[i], artificial_σ, (@SVector [-1*rand()/4, rand()/4, -1*rand()/4,0]))
@@ -86,6 +99,7 @@ for i in 1:length(art_λs)
 	push!(fitted_losses_parallel, loss_parallel)
 	push!(fitted_to_plot_parallel, fitted0_parallel[1](local_λ_parallel))
 end
+
 
 
 
