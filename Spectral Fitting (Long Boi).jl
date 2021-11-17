@@ -649,9 +649,6 @@ begin
 	@test all_same_size == 1
 end
 
-# ╔═╡ 6c1097c4-ac7d-42a7-8241-e185f25b44ab
-
-
 # ╔═╡ 061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 md"## Packages used"
 
@@ -1884,7 +1881,6 @@ version = "0.9.1+5"
 # ╠═8ab5e521-395b-4539-9617-67a8b64011af
 # ╟─890f0d73-3fa4-4ea6-a00a-c3672e8d0fa2
 # ╠═9b3c542e-579b-4f66-8518-4e234cd7c0e7
-# ╠═6c1097c4-ac7d-42a7-8241-e185f25b44ab
 # ╟─061f8147-a6f0-4a1b-9c19-bd65bc37bcee
 # ╠═caef09cc-0e00-11ec-1753-d7e117eb8c20
 # ╠═aed1a891-a5bb-469b-9771-43cb0945d214

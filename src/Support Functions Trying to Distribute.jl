@@ -1,34 +1,19 @@
 using StaticArrays
 using Distributed
 using Distributions
-@everywhere Pkg.add("StaticArrays")
+@everywhere using Pkg; Pkg.activate(".")
 @everywhere using StaticArrays
 @everywhere using SharedArrays
-@everywhere Pkg.add("Polynomials")
 @everywhere using Polynomials
-@everywhere Pkg.add("FillArrays")
 @everywhere using FillArrays
-@everywhere Pkg.add("Statistics")
 @everywhere using Statistics
-@everywhere Pkg.add("ThreadsX")
 @everywhere using ThreadsX
-@everywhere Pkg.add("Gumbo")
 @everywhere using Gumbo
-@everywhere Pkg.add("FITSIO")
 @everywhere using FITSIO
-@everywhere Pkg.add("DataFrames")
 @everywhere using DataFrames
-@everywhere Pkg.add("LazyArrays")
-@everywhere Pkg.add("StructArrays")
 @everywhere using LazyArrays, StructArrays
-@everywhere Pkg.add("SpecialPolynomials")
 @everywhere using SpecialPolynomials
-
-@everywhere Pkg.add("LinearAlgebra")
-@everywhere Pkg.add("PDMats")
 @everywhere using LinearAlgebra, PDMats
-
-@everywhere Pkg.add("FLoops")
 @everywhere using FLoops
 
 
