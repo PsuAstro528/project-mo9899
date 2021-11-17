@@ -1,30 +1,40 @@
-using Markdown
-using InteractiveUtils
-using FITSIO
-using DataFrames
-using LazyArrays, StructArrays
-using SpecialPolynomials
-using Gumbo
-using ThreadsX
-using Statistics: mean
-using FillArrays
-using StaticArrays
-using Polynomials
-#using PlutoUI, PlutoTest, PlutoTeachingTools
-using BenchmarkTools
-using Profile,  ProfileSVG, FlameGraphs
-using Plots 
-using LinearAlgebra, PDMats # used by periodogram.jl
-using Random
-Random.seed!(123)
-using FLoops
+using Distributed
+
+@everywhere begin
+	using Pkg
+	#Pkg.UPDATED_REGISTRY_THIS_SESSION[] = true
+	Pkg.activate(".")
+	#Pkg.instantiate()
+	#Pkg.precompile()
+end
+
+@everywhere begin
+	using Markdown
+	using InteractiveUtils
+	using FITSIO
+	using DataFrames
+	using LazyArrays, StructArrays
+	using SpecialPolynomials
+	using Gumbo
+	using ThreadsX
+	using Statistics: mean
+	using FillArrays
+	using StaticArrays
+	using Polynomials
+	#using PlutoUI, PlutoTest, PlutoTeachingTools
+	using BenchmarkTools
+	using Profile,  ProfileSVG, FlameGraphs
+	using Plots 
+	using LinearAlgebra, PDMats # used by periodogram.jl
+	using Random
+	Random.seed!(123)
+	using FLoops
+	using Test
+end
 
 
-
-
-
-include("./src/Support Functions.jl")
-using .SupportFunctions
+@everywhere include("./src/Support Functions.jl")
+@everywhere using .SupportFunctions
 
 
 
@@ -50,22 +60,17 @@ var = var_raw[mask_nonans]
 
 
 
+@testset "Testing input data was read correctly" begin
 
-##@test length(λ) > 0
-##@test length(flux) == length(λ) == length(var)
+	@test length(λ) > 0
+	@test length(flux) == length(λ) == length(var)
+end
 
 
 
-md"""
 # Removing Background Diffraction Pattern
-"""
-
-
-md"""
-##### When light passes through a diffraction grating, it takes the shape of a Blaze function, so the observations follow a Blaze shape. We remove the Blaze background here by fitting a model (called Blaze 2) and removing that from the data.
-"""
-
-
+# When light passes through a diffraction grating, it takes the shape of a Blaze function, so the observations follow a Blaze shape. 
+# We remove the Blaze background here by fitting a model (called Blaze 2) and removing that from the data.
 # Removing Blaze background by dividing observations by blaze function
 	
 
@@ -83,27 +88,20 @@ plot!(p, λ[pix_fit],flux[pix_fit], label="Observation",color=:grey)
 plot!(p, λ[pix_fit],blaze_model2.(pix_fit), label="Blaze 2",color=:blue)
 xlabel!("λ (Å)")
 ylabel!("Flux")
-savefig("Fitted_Blaze.png")
+savefig("Main Outputs/Fitted_Blaze.png")
 	
 
 
 pix_fit1 = closest_index(λ, 4550):closest_index(λ, 4560)
-#local plt = plot(legend=:bottomright)
-#plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model0.(pix_fit), label="Observation/Blaze 0",color=:red)
-#plot!(plt,λ[pix_fit],flux[pix_fit]./blaze_model1.(pix_fit), label="Observation/Blaze 1",color=:green)
-#plot!(plt,λ[pix_fit1],flux[pix_fit1]./blaze_model2.(pix_fit1), label="Observation/Blaze 2", color=:blue)
-
 p1 = plot(legend=:bottomright)
 plot!(p1, λ[pix_fit],flux[pix_fit]./blaze_model2.(pix_fit), label="Observation/Blaze 2", color=:blue, legend=:bottomright)
-
 xlabel!("λ (Å)")
 ylabel!("Normalized Flux")
-savefig("Blaze_Removed.png")
+savefig("Main Outputs/Blaze_Removed.png")
 
 
-md"""
-#Picking a the full range of wavelengths. 
-"""
+#Picking the full range of wavelengths. 
+
 
 
 pix_plt = closest_index(λ, 4550):closest_index(λ, 4610) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun. When we move to parallelized code, we will look at all wavelengths, not just this smaller band.
@@ -132,23 +130,20 @@ num_gh_orders = 4 #here we can set the order of GH polynomial fits for the rest 
 
 
 #Fitting in serial to these lines
-fitted0 = fit_lines_v0_serial(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
+fitted0 = fit_lines_v0_parallel_experimental(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
 fitted_lines = fitted0[1].lines	
 losses0 = fitted0[2]
 	
 
 
+@testset "Testing losses were properly found" begin
 
-#@test length(losses0) == length(fitted_lines) == length(λ_lines) #testing to make sure all the lines have been fitted to, and there is a loss for each fit
-### Regression test for fit
-#@test maximum(losses0) < 15
+	@test length(losses0) == length(fitted_lines) == length(λ_lines) #testing to make sure all the lines have been fitted to, and there is a loss for each fit
+end
 
 
 # Plotting all fitted lines
 
-
-
-	
 fit_windows = fill(0.0,2*length(λ_lines))
 loss_windows = fill(0.0,2*length(λ_lines))
 
@@ -172,62 +167,63 @@ plot!(p2,df.λ,fitted0[1](df.λ),label="Model")
 #vline!(loss_windows, label="Loss window")
 xlabel!("λ (Å)")
 ylabel!("Normalized Flux")
-savefig("Fitted Lines.png")
+savefig("Main Outputs/Fitted Lines.png")
 
 
 
-md"""
-### Printing out Losses
-"""
 
-
-losses0
-
-
-fitted_lines
-
-
-md"""
-### Printing out Gauss-Hermite coefficients
-"""
-
-
-#reading Gauss-Hermite Coefficients from the fitted lines
-begin
-	
-	
-	num_lines_found = length(fitted_lines)
-	num_gh_coeff = length(fitted_lines[1].gh_coeff)
-	gh_s = reshape(zeros(num_lines_found*num_gh_coeff), num_lines_found, num_gh_coeff)
-	#gh_s = Array{Float64}(undef, length(lines_found), length(lines_found[1].gh_coeff))
-	for i in 1:length(fitted_lines)
-		gh = fitted_lines[i].gh_coeff
-		for j in 1:length(gh)
-			
-			gh_s[i,j] = gh[j]
-		end
-	end
+# Printing out Losses, Writing to file
+println(losses0)
+losses_file_out = open("Main Outputs/fitted_losses.txt", "w")
+for i in 1:length(losses0)
+	write(losses_file_out, losses0[i])
+	write(losses_file_out, "\n")
 end
 
 
-md"""
-##### Running tests on the found Gauss-Hermite Coefficients
-"""
+# Printing fitted lines`
+println(fitted_lines)
+fitted_lines_out = open("Main Outputs/fitted_lines.txt", "w")
+for i in 1:length(fitted_lines)
+	write(fitted_lines_out, fitted_lines[i].gh_coeff)
+	write(fitted_lines_out, "\n")
+end
 
 
-##@test num_lines_found == length(λ_lines) #make sure all lines have been fitted to
+
+#reading Gauss-Hermite Coefficients from the fitted lines
+
+found_gh_output = open("Main Outputs/ghs_out.txt", "w")
+	
+num_lines_found = length(fitted_lines)
+num_gh_coeff = length(fitted_lines[1].gh_coeff)
+gh_s = reshape(zeros(num_lines_found*num_gh_coeff), num_lines_found, num_gh_coeff)
+#gh_s = Array{Float64}(undef, length(lines_found), length(lines_found[1].gh_coeff))
+for i in 1:length(fitted_lines)
+	gh = fitted_lines[i].gh_coeff
+	for j in 1:length(gh)
+		write(found_gh_output, gh[j])
+		write(found_gh_output, " ")
+		gh_s[i,j] = gh[j]
+	end
+	write(found_gh_output, "\n")
+end
 
 
-##@test num_gh_coeff == num_gh_orders #make sure all orders exist
 
-
+# Running tests on the found Gauss-Hermite Coefficients
+@testset "Confirming Gauss-Hemite Coefficients Properly Found" begin
+@test num_lines_found == length(λ_lines) #make sure all lines have been fitted to
+@test num_gh_coeff == num_gh_orders #make sure all orders exist
 #checking if all lines have exactly the same number of gh_coefficients
 begin
 	all_same_size = 1 #1 as in true, if false, it will be 0
 	for i in 1:length(fitted_lines)
 		if (length(fitted_lines[i].gh_coeff) != num_gh_coeff)
-			global all_same_size = 0
+			all_same_size = 0
 		end
 	end
-	##@test all_same_size == 1
+	@test all_same_size == 1
+end
+
 end
