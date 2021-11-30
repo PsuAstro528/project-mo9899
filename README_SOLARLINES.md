@@ -36,4 +36,4 @@ For benchmarking, we benchmark the serial and parallel implementation of fitting
 
 ### Overview of Package Structure:
 The main "meat" of this code is in the 'Script (Main).jl' script. The other scripts do testing and benchmarking, as outlined above. The plots from the testing script are output in the 'Testing_plots' directory.
-Important codes and functions are in src. The
+Important codes and functions are in src. The outputted plots from the main script, the fitted G-H coefficients and outputted losses are printed in the Main Outputs directory. Testing plots are outputted in the 'Testing_plots' directory.
