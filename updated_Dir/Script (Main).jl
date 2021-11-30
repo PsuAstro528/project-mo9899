@@ -104,7 +104,7 @@ savefig("Main Outputs/Blaze_Removed.png")
 
 
 
-pix_plt = closest_index(λ, 4550):closest_index(λ, 4610) #finds the indices that most closely correspond to λ = 4569.94 and λ=4579.8 angstroms. These wavelengths are mostly just arbitrarily chosen, where we found lines within this wavelength band from a list of known absorption lines in the Sun. When we move to parallelized code, we will look at all wavelengths, not just this smaller band.
+pix_plt = closest_index(λ, 4550):closest_index(λ, 4610) #finds the indices that most closely correspond to λ = 4550 and λ=4610 angstroms, the entire range of wavelengths observed by NEID
 
 # Building a dataframe, where the fluxes have the blaze background removed
 df = DataFrame( λ=view(λ,pix_plt), 

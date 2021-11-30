@@ -1,7 +1,13 @@
 # Astro 528 Project: Create models for Absorption Lines using Solar Spectrum Data from NEID instrument
 ## Mary Ogborn and Karthik Yadavalli
 
-### Goals:
+### Project Overview:
+## A (Short) Scientific Interlude:
+The NEID instrument takes spectral observations of the Sun (our sun, Sol) in the wavelength band 4550-4610 Angstroms. All of the absorption lines in this wavelength band are observed and the specific flux over this wavelength band is observed by NEID. 
+### Installation Instructions
+### Testing:
+### Benchmarking:
+### Overview of Package Structure:
 * Create models for known solar absorption lines utilizing Gauss-Hermite polynomials
 * Evaluate common shifts in absorption lines and determine what type of broadening or shift is at work utilizing the coefficients found of the Gauss-Hermite Polynomials
 * The first order G-H coefficient finds the depth of the line, the second order coefficient finds the asymmetry of the line, the third order finds the broadening of the line, and so on. This code will find all such coefficients to order N.

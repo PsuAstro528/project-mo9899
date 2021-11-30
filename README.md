@@ -13,33 +13,18 @@
 * Exclude certain pixels near the edge of the detector from the dataset, where the observations are distorted or unreliable
 * Remove blaze function background from the observed data, since we are dealing with diffraction data which follows a blaze pattern
 * Divide our observation by our blaze function to view the continuum and all the absorption features
-* Pick a range of wavelengths to start on the code
-* Tested fitting one absorption line using the Gauss-Hermite Polynomials to the fourth order (fit_line_v0), with the Gauss-Hermite polynomial function at the bottom of the code
-* Fitted many absorption lines (fit_lines_v0)-the lines we fit to were chosen mostly at random, just to find a set of lines that were easy to fit to, to focus on parallelizing
-* There are two versions of fit_lines_v0: fit_lines_v0_serial and fit_lines_v0_parallel, which both do the same computation, but in either serial or parallel
-* The functions above both find a measure of loss (goodness of fit measure) and the wavelength at which this value is minimized
-* Benchmarking the two versions of fit_lines_v0 to show that the parallel version is significantly faster (see note about this further in this document) 
-* Print out evaluations of loss for each fit and coefficients of the Hermite Polynomials for each fit
-* Tested that the number of lines found is equal to the number of lines we looked for
-* Tested that we found the expected number of Gauss-Hermite coefficients
+* Pick a range of wavelengths to start on the code (this has been extended to the full range available)
+* There are three scripts-main, testing, and timing; main fits to a set of 53 lines in parallel and outputs the Gauss-Hermite polynomials from the fit
+* Testing creates fake lines and fits to them in both serial and parallel, showing that both produce the same output. 
+* Timing re-reads in all the data, and fits to all 53 lines, timing how long such a fit takes. We regularly see a speed up of ~2-2.5x from serial to parallel
 
-### Steps since previous submission:
-* Found a value for \sigma, the standard deviation for each line, by just assuming the value equals some predetermined value
-* Used the loss function to find "the best" wavelength, instead of fitting to a predetermined wavelength value
+
 
 ### Next Steps:
-* The code has a bug, where the benchmarking sometimes crashes. The cell where both the serial and parallel versions of the function are run and timed sometimes crashes. With no changes to the structure of the code, that cell runs as expected most of the time, and sometimes crashes.
-* We will also use the recurrence relation soon, to use a taylor expansion of a G-H polynomial fit to find shifts in lines, rather than the method we descibe below
-* Use the Hermite coefficients to examine the shifts in solar data and attribute to physical processes on the sun
-* Fit to more lines. We are currently only fitting to the original set of lines, and while (as you can see in the comment in the code) it should be relatively easy to extend to more lines, this has given some issues, and we have not done it yet.
-* We appreciate the patience of the reviewer, as we will soon move the code from one long pluto notebook into local .jl files. We simply have not been able to do so yet.
+* Simply need to create a presentation version of this code for our presentation.
+* Will need to properly document everything, perhaps in a pdf file, to fully highlight everything that the code does, and will need to package the code, as in lab 9.
 
-### For Reviewers
-* We see a significant increase in computational efficiency from the serial to parallel version of fit_lines_v0, where the parallel usually runs 4-12 times faster on 
-* For each line, we take a window of \lambda_cent-0.25\sigma to \lambda_cent+0.25\sigma. Over this window, we do the Gauss-Hermite fit for the wavelength \lambda = \lambda_cent + i, where i loops from \lambda_cent-0.25\sigma to \lambda_cent+0.25\sigma
-* Then, for each G-H fit, we calculate loss, as defined below, over the total window \lambda_cent-2.5\sigma to \lambda_cent+2.5\sigma. Note that the window over which loss is calculated does not change with i
-* The loss function is found by calculating the sum of the difference between predicted flux from observed flux over the wavelength region \lambda-2.5\sigma to \lambda-2.5\sigma. 
-* These values of \pm 0.25 \sigma and \pm 2.5 \sigma were found by fine-tuning a series of G-H fits to known lines.
+
 
 [![Open in Visual Studio Code](https://classroom.github.com/assets/open-in-vscode-f059dc9a6f8d3a56e377f745f24479a46679e63a5d9fe6f495e02850cd0d8118.svg)](https://classroom.github.com/online_ide?assignment_repo_id=5589173&assignment_repo_type=AssignmentRepo)
 # Astro 528 [Class Project](https://psuastro528.github.io/project/)
