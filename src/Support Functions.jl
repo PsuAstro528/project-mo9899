@@ -455,7 +455,8 @@ module SupportFunctions
 
 	function test_fit_perfect(artificial_line::AbsorptionLine, s_or_p::Integer)
 		
-		#This function compares serial to parallel implementation results for the perfect lines. 
+		#This function compares serial to parallel implementation results for the perfect lines. In practice, the main script calls this function twice:
+		#once to get the fits from serial and once to get the fits from parallel. This function essentially creates the perfect lines, sends them to the serial or parallel fitting function above, and spits back out the line.
 		
 		#s_or_p = 0 if it should be a serial test and s_or_p = 1 if a parallel test
 		@assert s_or_p == 0 || s_or_p == 1
@@ -522,6 +523,9 @@ module SupportFunctions
 
 	function test_fit_delta(wavelength::T1) where{T1<:Number}
 				  
+		#This function is the "terrible" counterpart to the above function. It creates the "terrible" lines (essentially a box-shaped absorption line) at a given wavelength with randomized width and center. Then it fits to that using serial and parallel implementations from above. 
+		#Note that this function was written slightly differently from the above version in that this function is only called once by the main script. When called once, this function does both serial and parallel fitting in one go and returns the results. 
+		#We hope this slight difference of implementation of the test fit functions does not confuse the end user too much.
 		#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
 		
 		
