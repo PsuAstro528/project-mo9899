@@ -165,7 +165,8 @@ module SupportFunctions
 	end;
 
 
-	#As outlined in the README, we had to artifically tune two windows over wavelength. One is the window over which
+	#As outlined in the README, we had to artifically tune two windows over wavelength. One is the window over which loss is calculated and one is the window within which all wavelengths are fitted to, using GH polynomials.
+	#These are defined here in terms of how many standard deviations from the central (user-inputted) wavelength this window is centered. We assume standard deviation is 0.04 in these units (Angstroms).
 	loss_devs = 5 
 	fit_devs = 3
 
@@ -176,6 +177,7 @@ module SupportFunctions
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 		
 		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+		#note that this is the serial implementation of fitting to multiple lines.
 		
 		@assert size(λ) == size(flux) == size(var)
 		n_pix = length(λ)
@@ -241,6 +243,8 @@ module SupportFunctions
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 		
 		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+		#This is our first parallel implementation. It is NO LONGER used by the main script. It is only in here for reasons of tradition and aesthetics
+		#(What? you don't think a long mundane function that has not served its purpose efficiently in months is aethetic?)
 		
 		@assert size(λ) == size(flux) == size(var)
 		n_pix = length(λ)
@@ -306,6 +310,8 @@ module SupportFunctions
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 		
 		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+		#This is the currently used and final implementation of our parallel fitting algorithm.
+		
 		
 		@assert size(λ) == size(flux) == size(var)
 		n_pix = length(λ)
@@ -317,18 +323,15 @@ module SupportFunctions
 		covar = PDiagMat(var)   # diagonal covariance matrix
 		design_matrix = ones(n_pix,1)
 		
-		#fitted_lines = []
-		#fitted_losses = []
 		
-		#fitted_lines = SharedArray{AbsorptionLine}(n_lines, 1)
-		#fitted_losses = SharedArray{Float64}(n_lines, 1)
 		
 		fitted_lines = SharedArray{AbsorptionLine}(n_lines)
 		fitted_losses = SharedArray{Float64}(n_lines)
 		@sync @distributed for i in 1:n_lines
 			λ_line = λ_lines[i]
 			σ_line = 0.04
-			#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
+			
+			#will try fitting to every wavelength in the range λ_line-fit_devs*σ_line to λ_line+fit_devs*σ_line
 			lowest_idx = closest_index(λ, λ_line-fit_devs*σ_line)
 			highest_idx = closest_index(λ, λ_line+fit_devs*σ_line)
 			
@@ -350,20 +353,17 @@ module SupportFunctions
 				
 				
 				
-				#calculating loss for this fit
+				#calculating loss for this fit in window from λ_line-loss_devs*σ_line to λ_line+loss_devs*σ_line
 				lowest_loss_idx = closest_index(λ, λ_line+(-1*loss_devs*σ_line))
 				highest_loss_idx = closest_index(λ, λ_line+loss_devs*σ_line)
 				
 				loss = 0.0
-				#for k = lowest_loss_idx:highest_loss_idx
-				#	loss+=abs(flux[k]-line.(λ[k]))
-				#end
+				
 				
 				
 				flux_red = flux[lowest_loss_idx:highest_loss_idx]
 				
-				#var_red = var[lowest_loss_idx:highest_loss_idx]
-				#chi_sq = sum(((flux_red.-line.(λ_red)).^2)./var_red)
+				
 				line_red = line.(λ[lowest_loss_idx:highest_loss_idx])
 				
 				@floop ThreadedEx() for k in eachindex(flux_red)
@@ -377,20 +377,12 @@ module SupportFunctions
 					best_fit_idx = j
 				end
 				
-				#losses[j-lowest_idx+1] = loss
+				
 				
 			end
 			
-			#find fit with lowest loss
-			#best_fit_loss = losses[length(losses)]
-			
-			#best_fit_loss, best_fit_idx = findmin(losses)
-			
+			#find fit with lowest loss			
 			best_fit_λ = λ[best_fit_idx]
-			#best_fit_line = line_tries[length(line_tries)]
-			
-			#push!(fitted_lines, best_fit_line)
-			#push!(fitted_losses, best_fit_loss)
 			fitted_lines[i] = line_tries[length(line_tries)]
 			fitted_losses[i] = losses[length(losses)]
 		end
@@ -398,6 +390,7 @@ module SupportFunctions
 		
 	end;
 
+	#=
 	function fit_lines_v0_parallel_old(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
 				{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
@@ -456,13 +449,14 @@ module SupportFunctions
 		return SpectrumModel(1,fitted_lines), fitted_losses
 		
 	end;
-
-
+	=#
 
 	#Testing 
 
 	function test_fit_perfect(artificial_line::AbsorptionLine, s_or_p::Integer)
-				  
+		
+		#This function compares serial to parallel implementation results for the perfect lines. 
+		
 		#s_or_p = 0 if it should be a serial test and s_or_p = 1 if a parallel test
 		@assert s_or_p == 0 || s_or_p == 1
 		#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
