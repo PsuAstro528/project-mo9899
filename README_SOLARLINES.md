@@ -24,6 +24,6 @@ For both, the serial implementation and the parallel implementation is run. The 
 should be very small for the "perfect" fit.
 
 ### Benchmarking:
-For benchmarking, we 
+For benchmarking, we benchmark the serial and parallel implementation of fitting to the 53 lines. With four workers, we see a speed-up of roughly 2-2.5x each benchmarking.
 
 ### Overview of Package Structure:
