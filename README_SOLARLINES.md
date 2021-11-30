@@ -17,8 +17,8 @@ window size that produces the "best" fit (here, "best" fit is determined by eye 
 ### Installation Instructions
 ### Testing:
 For testing, we use the fitting algorithm to fit to two artifically created lines:
-* 1) Perfect Line - A line that is defined by a Gauss-Hermite fit is fed into the algorithm (which tries to fit a Gauss-Hermite polynomial), so the fit should be "perfect". 
-* 2) Terrible Line - A horizontal line is fed into the algorithm, so the first should be "terrible".
+* Perfect Line - A line that is defined by a Gauss-Hermite fit is fed into the algorithm (which tries to fit a Gauss-Hermite polynomial), so the fit should be "perfect". 
+* Terrible Line - A horizontal line is fed into the algorithm, so the first should be "terrible".
 
 For both, the serial implementation and the parallel implementation is run. The test should be that both serial and parallel should produce the same output. In addition, the evaluated loss
 should be very small for the "perfect" fit.
