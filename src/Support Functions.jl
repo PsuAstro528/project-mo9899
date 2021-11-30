@@ -176,7 +176,8 @@ module SupportFunctions
 				{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 		
-		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
+		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. 
+		#This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
 		#note that this is the serial implementation of fitting to multiple lines.
 		
 		@assert size(λ) == size(flux) == size(var)

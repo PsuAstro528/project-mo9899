@@ -128,7 +128,7 @@ num_gh_orders = 4 #here we can set the order of GH polynomial fits for the rest 
 λ_lines = λ_lines_eyeball
 
 
-#Fitting in serial to these lines
+#Fitting in parallel to these lines
 fitted0 = fit_lines_v0_parallel_experimental(λ_lines,df.λ,df.flux,df.var, order = num_gh_orders)
 fitted_lines = fitted0[1].lines	
 losses0 = fitted0[2]
