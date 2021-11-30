@@ -29,10 +29,13 @@ should be very small for the "perfect" fit. This is all done in the 'Script (Tes
 to the local directory 'Testing_plots', showing how good the "perfect" fits and how bad the "terrible" fits are. The results of testing is done in terminal, where the above comparisons (serial to parallel and loss should be small for 'perfect')
 are the @test commands run.
 
+To rerun tests, one might install this code following the above instructions, and run the "Script (Testing).jl" script.
+
 
 ### Benchmarking:
-For benchmarking, we benchmark the serial and parallel implementation of fitting to the 53 lines. With four workers, we see a speed-up of roughly 2-2.5x each benchmarking. This is done on 
-'Script (Timing).jl', and the benchmarking is shown in terminal. 
+For benchmarking, we benchmark the serial and parallel implementation of fitting to the 53 lines. With four workers, we see a speed-up of roughly 2x each time benchmarking is done. This is done on 
+'Script (Timing).jl', and the benchmarking is shown in terminal. To rerun benchmarking, one can simply run the "Script (Timing).jl" script and look at the outputs in terminal. We show a screenshot of benchmarking done in the past in the 
+Benchmarking Results.png file.
 
 ### Overview of Package Structure:
 The main "meat" of this code is in the 'Script (Main).jl' script. The other scripts do testing and benchmarking, as outlined above. The plots from the testing script are output in the 'Testing_plots' directory.
