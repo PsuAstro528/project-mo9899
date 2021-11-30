@@ -22,7 +22,7 @@ In the Main Outputs directory, we plot the original NEID data with a fitted Blaz
 ### Testing:
 For testing, we use the fitting algorithm to fit to two artifically created lines:
 * Perfect Line - A line that is defined by a Gauss-Hermite fit is fed into the algorithm (which tries to fit a Gauss-Hermite polynomial), so the fit should be "perfect". 
-* Terrible Line - A horizontal line is fed into the algorithm, so the first should be "terrible".
+* Terrible Line - A horizontal line is fed into the algorithm, so the fit should be "terrible".
 
 For both, the serial implementation and the parallel implementation is run. The test should be that both serial and parallel should produce the same output. In addition, the evaluated loss
 should be very small for the "perfect" fit. This is all done in the 'Script (Testing).jl' script. This script also creates a digital plot of the perfect fits and terrible fits, and saves those
