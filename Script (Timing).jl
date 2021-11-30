@@ -32,7 +32,8 @@ end
 	using FLoops
 	end;
 	
-#addprocs(4)
+#note, you will see a lot of @everywhere's in this code, this is because this script is for timing, and all the workers need to be awaken
+
 
 
 
@@ -43,9 +44,8 @@ end
 @everywhere data_path = ""  #Data is stored in same directory as this file
 @everywhere filename = "neidL1_20210305T170410.fits"
 @everywhere f = FITS(joinpath(data_path,filename))
-@everywhere order_idx = 40      # Arbitrarily picking just one order for this example
-@everywhere pix_fit = 1025:8096  # Exclude pixels near edge of detector where there are issues that complicate things and we don't want to be distracted by
-
+@everywhere order_idx = 40      
+@everywhere pix_fit = 1025:8096  
 
 
 #reading in wavelength, flux, and variance data

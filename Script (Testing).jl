@@ -72,7 +72,7 @@ fitted_losses_parallel = []
 fitted_to_plot_parallel = []
 
 
-for i in 1:length(art_λs)
+for i in 1:length(art_λs) #this is written in a caveman for-loop just because I am not too worried about performance enhancements for the testing script.
 	l_test = AbsorptionLine(art_λs[i], artificial_σ, (@SVector [-1*rand()/4, rand()/4, -1*rand()/4,0]))
 
 

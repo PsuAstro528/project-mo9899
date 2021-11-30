@@ -88,7 +88,7 @@ plot!(p, λ[pix_fit],flux[pix_fit], label="Observation",color=:grey)
 plot!(p, λ[pix_fit],blaze_model2.(pix_fit), label="Blaze 2",color=:blue)
 xlabel!("λ (Å)")
 ylabel!("Flux")
-savefig("Main Outputs/Fitted_Blaze.png")
+savefig("Main Outputs/Fitted_Blaze.png") #plotting the fitted blaze to local directory
 	
 
 
@@ -97,7 +97,7 @@ p1 = plot(legend=:bottomright)
 plot!(p1, λ[pix_fit],flux[pix_fit]./blaze_model2.(pix_fit), label="Observation/Blaze 2", color=:blue, legend=:bottomright)
 xlabel!("λ (Å)")
 ylabel!("Normalized Flux")
-savefig("Main Outputs/Blaze_Removed.png")
+savefig("Main Outputs/Blaze_Removed.png") #plotting the fluxes after blaze background is removed.
 
 
 #Picking the full range of wavelengths. 
@@ -115,8 +115,7 @@ df = DataFrame( λ=view(λ,pix_plt),
 
 
 
-# Fit to Real Solar Absorption Lines"
-# Note: we use a loss function to evaluate the fitting of each line. Loss function is defined as sum[abs(predicted-actual flux)] for λ = λ-3*σ:λ-3*σ
+# Fit to Real Solar Absorption Lines
 
 
 
@@ -167,7 +166,7 @@ plot!(p2,df.λ,fitted0[1](df.λ),label="Model")
 #vline!(loss_windows, label="Loss window")
 xlabel!("λ (Å)")
 ylabel!("Normalized Flux")
-savefig("Main Outputs/Fitted Lines.png")
+savefig("Main Outputs/Fitted Lines.png") #plotting the fitted lines to local directory so end use can check by eye if the fits look acceptable.
 
 
 
