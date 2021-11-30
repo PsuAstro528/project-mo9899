@@ -33,7 +33,7 @@ end
 end
 
 
-@everywhere include("./src/Support Functions.jl")
+@everywhere include("./src/Support Functions.jl") #will eventually parallelize, so I need to wake up all of the workers.
 @everywhere using .SupportFunctions
 
 
