@@ -21,18 +21,22 @@ module SupportFunctions
 	export test, fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, test_fit_perfect, test_fit_delta, fit_lines_v0_parallel_experimental
 
 	#Blaze Function Modeling
+	#Because NEID is a disperser, all data it captures follows a blaze pattern (the data it observes looks like a parabola) and this pattern needs to be removed. 
 
 
 	function test()
+		#This is really just a test function, I used it to make sure exporting works properly. My heart just won't let me delete this function..We went through a lot together... End users can ignore it. 
 		println("Hello world")
 	end
 
 	struct BlazeModel{T}
+		#The blaze model that we try to remove needs a central wavelength, where the parabolic shape reaches a maximum and some polynomial fit.
 		x_mean::T
 		polyn::Polynomial{T,:x}
 	end
 	
 	function (blaze::BlazeModel{T})(x::T1)   where { T<:Number, T1<:Number } 
+		#This literally just evaluates the value of the blaze at a given wavelength.
 		blaze.polyn(x-blaze.x_mean)
 	end
 
@@ -42,6 +46,7 @@ module SupportFunctions
 							T::Type = promote_type(T1,T2,T3); order::Integer = 8, mask = 1:length(x)  ) where
 				{ T1<:Number, T2<:Number, T3<:Number,
 				V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
+		#This does the fitting of the blaze model to the NEID data
 		x_mean = mean(x[mask])
 		fit_result = fit( x[mask].-x_mean, 
 						  flux[mask], order, weights=1.0./var[mask] )
@@ -52,6 +57,7 @@ module SupportFunctions
 							T::Type = promote_type(T1,T2,T3); order::Integer = 8, mask = 1:length(x)  ) where
 				{ T1<:Number, T2<:Number, T3<:Number,
 				V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
+		#This does the fitting of the blaze model to the NEID data
 		x_mean = mean(view(x,mask))
 		fit_result = fit( view(x,mask).-x_mean,
 						  view(flux,mask), order, weights=1.0./view(var,mask) )
@@ -61,14 +67,18 @@ module SupportFunctions
 
 
 	#Absorption Line and GH Parametrization of it
+	#We fit to each line in the NEID data that we try to fit to using a GH polynomial. To do so, we invent a struct called absorption line. 
 
 	struct AbsorptionLine
+		
 			λ::Float64
 			σ::Float64
-			gh_coeff::SVector{4,Float64}  # Statically allocated to reduce memory allocations
+			gh_coeff::SVector{4,Float64}
 		end;
 
 	function (line::AbsorptionLine)(λ)
+			#This function returns the value of an Absorption line evaluated at a given wavelength. In practice, it is simply a 4-th order GH polynomial being evaluated
+			#at a specific wavelength.
 			T = typeof(line.λ)
 			gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials 
 			x = (λ.-line.λ)./line.σ
@@ -81,15 +91,16 @@ module SupportFunctions
 		end
 
 	function gaussian(line::AbsorptionLine, λ::Number)
+			#Just a gaussian, this is used in creating Gaussians for GH polynomials and in creating absorption lines.
 			exp(-((λ-line.λ)/line.σ)^2//2)
 		end
 		
 	# Precompute Gauss-Hermite polynomials once.
-	# Should move to module, so not in global scope
 	gh_polynomials = [basis(Hermite, i)(variable(Polynomial{Float64})) for i in 0:10]
 
 		
 	function gauss_hermite_basis(line::AbsorptionLine, λ, order::Integer)
+		#Creates a GH polynimal for the given line, fits to it, and evaluates the value of this GH polynomial at a given wavelength.
 		@assert 1 <= order+1 <= length(gh_polynomials)
 		T = typeof(line.λ)
 		gh_poly::Polynomial{T,:x} = gh_polynomials[order+1] 
@@ -136,7 +147,7 @@ module SupportFunctions
 
 
 	function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
-		#this function finds the index in the array λ of the value that is closest to num_to_find
+		#This function finds the index in the array λ of the value that is closest to num_to_find
 		max_val = maximum(λ)
 		min_val = minimum(λ)
 		i_tor = 1 #"tor" as in "to return"
@@ -154,7 +165,8 @@ module SupportFunctions
 	end;
 
 
-	loss_devs = 5
+	#As outlined in the README, we had to artifically tune two windows over wavelength. One is the window over which
+	loss_devs = 5 
 	fit_devs = 3
 
 
