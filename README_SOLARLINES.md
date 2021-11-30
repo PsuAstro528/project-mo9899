@@ -9,9 +9,10 @@ this wavelength band is observed by NEID.
 The goal of this project is to find and fit to many absorption lines in this wavelength band. It does so by fitting a high-order Gauss-Hermite polynomial to the shape for each absorption line in the flux observations. 
 In our final implementation, we fit to 53 known absorption lines in parallel. To find the "best" fit, the code uses a value we call 'loss', equivalent to the sum of the difference between observed flux and fitted flux over a window 
 of wavelengths that includes the wavelength at which the code tries to fit. The code tries a series of wavelength centered on the wavelength manually fed in by the coder and returns the wavelength and evaluated loss of the wavelength
-that gives the smallest value of loss. 
+that gives the smallest value of loss. The code also returns the coefficients of the G-H polynomial fit for each predefined absorption line.
 
-There are thus
+There are thus two windows-the window over which loss is calculated for a given wavelength fit, and the window over which different wavlengths fits are tried. We simply tried different window sizes for both and went with the choice of 
+window size that produces the "best" fit (here, "best" fit is determined by eye rather than by evaluated loss or some other fit evaluation function).s
 
 ### Installation Instructions
 ### Testing:
