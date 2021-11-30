@@ -12,9 +12,14 @@ of wavelengths that includes the wavelength at which the code tries to fit. The 
 that gives the smallest value of loss. The code also returns the coefficients of the G-H polynomial fit for each predefined absorption line.
 
 There are thus two windows-the window over which loss is calculated for a given wavelength fit, and the window over which different wavlengths fits are tried. We simply tried different window sizes for both and went with the choice of 
-window size that produces the "best" fit (here, "best" fit is determined by eye rather than by evaluated loss or some other fit evaluation function).s
+window size that produces the "best" fit (here, "best" fit is determined by eye rather than by evaluated loss or some other fit evaluation function).
 
 ### Installation Instructions
 ### Testing:
+For testing, we use the fitting algorithm to fit to two artifically created lines:
+* 1) Perfect Line
+** This is a line 
+* 2) Terrible Line
+
 ### Benchmarking:
 ### Overview of Package Structure:
