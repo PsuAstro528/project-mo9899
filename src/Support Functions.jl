@@ -21,22 +21,40 @@ module SupportFunctions
 	export test, fit_lines_v0_serial, fit_lines_v0_parallel, closest_index, gaussian, gauss_hermite_basis, SpectrumModel, AbsorptionLine, gh_polynomials,  BlazeModel, fit_blaze_model, fit_blaze_model_v0, fit_devs, loss_devs, test_fit_perfect, test_fit_delta, fit_lines_v0_parallel_experimental
 
 	#Blaze Function Modeling
-	#Because NEID is a disperser, all data it captures follows a blaze pattern (the data it observes looks like a parabola) and this pattern needs to be removed. 
+	
 
 
 	function test()
-		#This is really just a test function, I used it to make sure exporting works properly. My heart just won't let me delete this function..We went through a lot together... End users can ignore it. 
+		"""
+			This is just a test function, I used it to make sure exporting works properly. My heart just won't let me delete this function..We went through a lot together... End users can ignore it. 
+			
+			parameters: None
+			returns: None
+		"""
+	
 		println("Hello world")
 	end
 
 	struct BlazeModel{T}
+		"""
+			Because NEID is a disperser, all data it captures follows a blaze pattern (the data it observes looks like a parabola) and this pattern needs to be removed. 
+			This is a struct of the blaze model that is removed, with a central wavelength x_mean and a polynomial fit polyn.
+			
+			parameters: T, some numerical value-the central wavelength of the pattern
+			returns: x_mean-the central wavelength, polyn-the polynomial fit of the Blaze
+		"""
 		#The blaze model that we try to remove needs a central wavelength, where the parabolic shape reaches a maximum and some polynomial fit.
 		x_mean::T
 		polyn::Polynomial{T,:x}
 	end
 	
 	function (blaze::BlazeModel{T})(x::T1)   where { T<:Number, T1<:Number } 
-		#This literally just evaluates the value of the blaze at a given wavelength.
+		"""
+			This function evaluates the value of the blaze model at a given wavelength. 
+			
+			parameters: blaze-a blaze model, which holds the corresponding polyn fit and central wavelength x_mean
+			returns: a polynomial with the blaze function evaluated
+		"""
 		blaze.polyn(x-blaze.x_mean)
 	end
 
@@ -46,7 +64,13 @@ module SupportFunctions
 							T::Type = promote_type(T1,T2,T3); order::Integer = 8, mask = 1:length(x)  ) where
 				{ T1<:Number, T2<:Number, T3<:Number,
 				V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
-		#This does the fitting of the blaze model to the NEID data
+		"""
+		Fitting blaze function to NEID data. 
+		
+		parameters: x-vector of NEID wavelengths to fit blaze function to, flux-vector of NEID fluxes, var-vector of NEID variances of flux, order-integer order of blaze function fit, 
+		returns: BlazeModel struct with a blaze model fitted to NEID data
+		"""
+	
 		x_mean = mean(x[mask])
 		fit_result = fit( x[mask].-x_mean, 
 						  flux[mask], order, weights=1.0./var[mask] )
@@ -57,7 +81,13 @@ module SupportFunctions
 							T::Type = promote_type(T1,T2,T3); order::Integer = 8, mask = 1:length(x)  ) where
 				{ T1<:Number, T2<:Number, T3<:Number,
 				V1<:AbstractVector{T1}, V2<:AbstractVector{T2}, V3<:AbstractVector{T3} } 
-		#This does the fitting of the blaze model to the NEID data
+		"""
+		Fitting blaze function to NEID data. 
+		
+		parameters: x-vector of NEID wavelengths to fit blaze function to, flux-vector of NEID fluxes, var-vector of NEID variances of flux, order-integer order of blaze function fit, 
+		returns: BlazeModel struct with a blaze model fitted to NEID data
+		"""
+		
 		x_mean = mean(view(x,mask))
 		fit_result = fit( view(x,mask).-x_mean,
 						  view(flux,mask), order, weights=1.0./view(var,mask) )
@@ -70,15 +100,25 @@ module SupportFunctions
 	#We fit to each line in the NEID data that we try to fit to using a GH polynomial. To do so, we invent a struct called absorption line. 
 
 	struct AbsorptionLine
-		
+			"""
+				Absorption line struct, holds the wavelength, variance, and list of GH coefficients corresponding to the Absorption Line. 
+				
+				parameters: \lambda-float64 that holds the central wavelength of the absorption line, \sigma-float64 that holds the variance of the absorption line, gh_coeff-vector that holds 4th order GH polynomial fit coefficients
+			"""
 			λ::Float64
 			σ::Float64
 			gh_coeff::SVector{4,Float64}
 		end;
 
 	function (line::AbsorptionLine)(λ)
-			#This function returns the value of an Absorption line evaluated at a given wavelength. In practice, it is simply a 4-th order GH polynomial being evaluated
-			#at a specific wavelength.
+			"""
+				This function returns the value of an Absorption line evaluated at a given wavelength. In practice, it is simply a 4-th order GH polynomial being evaluated
+				at a specific wavelength.
+				
+				parameters: \lambda-some vector of wavelengths at which the AbsorptionLine struct is evaluated.
+				returns: vector with size equal to \lambda whose values are the evaluation of normalized flux of absorption line at each wavelength in \lambda
+			"""
+			
 			T = typeof(line.λ)
 			gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials 
 			x = (λ.-line.λ)./line.σ
@@ -91,7 +131,12 @@ module SupportFunctions
 		end
 
 	function gaussian(line::AbsorptionLine, λ::Number)
-			#Just a gaussian, this is used in creating Gaussians for GH polynomials and in creating absorption lines.
+			"""
+			Just a gaussian, this is used in creating Gaussians for GH polynomials and in creating absorption lines.
+			
+			parameters: line-an absorption line, \lambda-a number
+			returns: vector holding values of gaussian centered at \lambda with wavelengths and variance given from the AbsorptionLine line
+			"""
 			exp(-((λ-line.λ)/line.σ)^2//2)
 		end
 		
@@ -100,7 +145,13 @@ module SupportFunctions
 
 		
 	function gauss_hermite_basis(line::AbsorptionLine, λ, order::Integer)
-		#Creates a GH polynimal for the given line, fits to it, and evaluates the value of this GH polynomial at a given wavelength.
+		"""
+		Creates a GH polynimal for the given line, fits to it, and evaluates the value of this GH polynomial at a given wavelength.
+		
+		parameters: line-an AbsorptionLine, \lambda-a number, order-a number that defines the order of the GH fit
+		returns: a vector with values of the GH polynomial that has been passed in through the AbsorptionLine line evaluted centered at wavelength \lambda passed in.
+		"""
+		
 		@assert 1 <= order+1 <= length(gh_polynomials)
 		T = typeof(line.λ)
 		gh_poly::Polynomial{T,:x} = gh_polynomials[order+1] 
@@ -112,6 +163,13 @@ module SupportFunctions
 
 
 	function gauss_hermite_basis(line::AbsorptionLine, λ; orders::AbstractVector{Int64} = 1:length(line.gh_coeff) )
+		"""
+		Creates a GH polynimal for the given line, fits to it, and evaluates the value of this GH polynomial at a given wavelength.
+		
+		parameters: line-an AbsorptionLine, \lambda-a number, order-a number that defines the order of the GH fit (takes default value of the number of GH coefficients in the absorption line if not explicitly defined)
+		returns: a vector with values of the GH polynomial that has been passed in through the AbsorptionLine line evaluted centered at wavelength \lambda passed in.
+		"""
+	
 		T = typeof(line.λ)
 		gh_polys::Vector{Polynomial{T,:x}} = gh_polynomials
 		x = (λ.-line.λ)./line.σ
@@ -126,11 +184,21 @@ module SupportFunctions
 	#Synthetic Spectrum Definitions
 
 	struct SpectrumModel
+		"""
+		A struct that holds a normalization constant norm (Float64) and a vector of AbsorptionLine lines 
+		This is used to hold multiple lines in a single object
+		"""
 		norm::Float64
 		lines::Vector{AbsorptionLine}
 	end
 
 	function (model::SpectrumModel)(λ)
+		"""
+			Evaluates the value of the spectrum of lines at a given \lambda
+			
+			parameters: \lambda-a number-the wavelength at which the spectrum's value needs to be interpreted.
+			returns: a vector whose values are the value of each line evaluated at the passed in \lambda wavelength.
+		"""
 		result = fill(model.norm,length(λ))
 		for i in 1:length(model.lines)
 			result .*= model.lines[i].(λ)
@@ -147,7 +215,13 @@ module SupportFunctions
 
 
 	function closest_index(λ::V1, num_to_find::Number) where {T1<:Number, V1<:AbstractVector{T1}}
-		#This function finds the index in the array λ of the value that is closest to num_to_find
+		"""
+			This function finds the index in the array λ of the value that is closest to num_to_find
+			
+			parameters: \lambda-a vector of wavelengths to search in, num_to_find-a number that we are looking for in the vector \lambda
+			returns: i_tor the index of the value in \lambda that is closest to num_to_find
+		"""
+		
 		max_val = maximum(λ)
 		min_val = minimum(λ)
 		i_tor = 1 #"tor" as in "to return"
@@ -176,7 +250,14 @@ module SupportFunctions
 				{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 		
-		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. 
+		"""
+			This function fits GH polynomials to Blaze-corrected NEID data, taking in the vector of NEID wavelengths λs, NEID variances σs, and NEID observed fluxes flux.
+			It takes in a vector of wavelengths λ_lines to "find" in NEID data. For each wavelength λ in λ_lines, this function tries fitting a GH polynomial to every wavelength in a window centered on λ.
+			After fitting to a certain λ, this function calculates the loss of this fit. Once it has fitted to every wavelength in the window centered on λ and has a loss evaluated for each fit, the script 
+			takes the wavelength in this window with the lowest loss evaluation. Note that this lowest-loss wavelength may not necessarily be the passed in λ (so this script can find shifts in lines from 
+			predicted values). This function then appends this best fit wavelength to a vector of best-fit wavelengths 
+			
+		"""
 		#This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
 		#note that this is the serial implementation of fitting to multiple lines.
 		

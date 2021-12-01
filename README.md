@@ -29,14 +29,22 @@ should be very small for the "perfect" fit. This is all done in the 'Script (Tes
 to the local directory 'Testing_plots', showing how good the "perfect" fits and how bad the "terrible" fits are. The results of testing is done in terminal, where the above comparisons (serial to parallel and loss should be small for 'perfect')
 are the @test commands run.
 
-To rerun tests, one might install this code following the above instructions, and run the "Script (Testing).jl" script.
+To rerun tests, one might install this code following the above instructions, and run the "Script (Testing).jl" script. The command would look like:
+julia --project=. -p 4 '.\Script (Testing).jl'
+where 4 is the number of workers you wish to test with. You may change this to any number of workers.
 
 
 ### Benchmarking:
 For benchmarking, we benchmark the serial and parallel implementation of fitting to the 53 lines. With four workers, we see a speed-up of roughly 2x each time benchmarking is done. This is done on 
 'Script (Timing).jl', and the benchmarking is shown in terminal. To rerun benchmarking, one can simply run the "Script (Timing).jl" script and look at the outputs in terminal. We show a screenshot of benchmarking done in the past in the 
-Benchmarking Results.png file.
+Benchmarking Results.png file. This command looks like:
+julia --project=. -p 4 '.\Script (Timing).jl'
+where 4 is the number of workers you wish to test with. You may change this to any number of workers.
+
 
 ### Overview of Package Structure:
 The main "meat" of this code is in the 'Script (Main).jl' script. The other scripts do testing and benchmarking, as outlined above. The plots from the testing script are output in the 'Testing_plots' directory.
 Important codes and functions are in src. The outputted plots from the main script, the fitted G-H coefficients and outputted losses are printed in the Main Outputs directory. Testing plots are outputted in the 'Testing_plots' directory.
+This can be run from terminal:
+julia --project=. -p 4 '.\Script (Main).jl'
+where 4 is the number of workers you wish to test with. You may change this to any number of workers.
