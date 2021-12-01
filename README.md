@@ -42,7 +42,7 @@ julia --project=. -p 4 '.\Script (Timing).jl'
 where 4 is the number of workers you wish to test with. You may change this to any number of workers.
 
 
-Below, we have attached the performances of our code when we either increase the number of workers (first figure) or when we increase the problem size (second figure). For both y-axes, we see a ratio of serial over parallel performance run time. While calculating, it should be noted that both versions had runtimes on the order of milliseconds. 
+Below, we have attached the performances of our code when we either increase the number of workers (first figure) or when we increase the problem size (second figure). For both y-axes, we see a ratio of serial over parallel performance run time. While calculating, it should be noted that both versions had runtimes on the order of hundreds of milliseconds. 
 
 ![increaseworkers](increaseworkers.png)
 
