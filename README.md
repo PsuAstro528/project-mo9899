@@ -19,6 +19,8 @@ lines, the background blaze function needs to be removed. Fitting to a blaze fun
 In the Main Outputs directory, we plot the original NEID data with a fitted Blaze background, the NEID data with blaze removed, and the absorption lines that have been fitted by the code.
 
 ### Installation Instructions
+To install this package, simply clone this github repository into your local directory. Then open the Julia environment in this directory and run the command Pkg.instantiate() to install all of the requirements for this package. Then run and enjoy!
+
 ### Testing:
 For testing, we use the fitting algorithm to fit to two artifically created lines:
 * Perfect Line - A line that is defined by a Gauss-Hermite fit is fed into the algorithm (which tries to fit a Gauss-Hermite polynomial), so the fit should be "perfect". 
