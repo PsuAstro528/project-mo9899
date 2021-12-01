@@ -4,7 +4,7 @@ using Distributed
 	using Pkg
 	#Pkg.UPDATED_REGISTRY_THIS_SESSION[] = true
 	Pkg.activate(".")
-	#Pkg.instantiate()
+	Pkg.instantiate()
 	#Pkg.precompile()
 end
 
