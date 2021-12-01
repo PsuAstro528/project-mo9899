@@ -13,7 +13,7 @@
 ## combine STDOUT and STDERR into one file
 #PBS -j oe
 ## Specifices job name, so easy to find in qstat
-#PBS -N FixedProbSize4Workers
+#PBS -N FixedProbSize4W
 
 ## Uncomment next 2 PBS commands (by removing one of #'s) and replace with your email if you want to be notifed when jobs start and stop
 #PBS -M sky5265@psu.edu
