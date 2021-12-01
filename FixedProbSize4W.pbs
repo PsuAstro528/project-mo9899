@@ -36,7 +36,7 @@ cd $PBS_O_WORKDIR            # Change into directory where job was submitted fro
 
 date
 echo "About to start Julia"
-julia --project=. -p 4 Script(Main).jl
+julia --project=. -p 4 Script_Main.jl
 echo "Julia exited"
 date
 
