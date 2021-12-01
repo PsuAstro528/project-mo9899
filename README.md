@@ -41,6 +41,9 @@ Benchmarking Results.png file. This command looks like:
 julia --project=. -p 4 '.\Script (Timing).jl'
 where 4 is the number of workers you wish to test with. You may change this to any number of workers.
 
+![increaseworkers](increaseworkers.png)
+![increasesize](increasesize.png)
+
 
 ### Overview of Package Structure:
 The main "meat" of this code is in the 'Script (Main).jl' script. The other scripts do testing and benchmarking, as outlined above. The plots from the testing script are output in the 'Testing_plots' directory.
