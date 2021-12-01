@@ -255,7 +255,14 @@ module SupportFunctions
 			It takes in a vector of wavelengths λ_lines to "find" in NEID data. For each wavelength λ in λ_lines, this function tries fitting a GH polynomial to every wavelength in a window centered on λ.
 			After fitting to a certain λ, this function calculates the loss of this fit. Once it has fitted to every wavelength in the window centered on λ and has a loss evaluated for each fit, the script 
 			takes the wavelength in this window with the lowest loss evaluation. Note that this lowest-loss wavelength may not necessarily be the passed in λ (so this script can find shifts in lines from 
-			predicted values). This function then appends this best fit wavelength to a vector of best-fit wavelengths 
+			predicted values). This function then appends this best fit wavelength to a vector of best-fit wavelengths and appends the corresponding loss to a vector of best-fit losses. Once all lines in λ_lines
+			have been fitted to, this function returns all the fitted lines in the form of a SpectrumModel and the list of best-fit losses.
+			
+			
+			parameters: λ_lines-a vector of wavelengths (type Number) which this function needs to find in NEID data, λ-the list of wavelengths at which NEID observes, flux-the list of fluxes NEID observed, 
+			var-the variance of each observation NEID made, 
+			
+			returns: SpectrumModel of fitted lines, fitted_losses: list of best-fit fitted losses
 			
 		"""
 		#This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
@@ -391,8 +398,23 @@ module SupportFunctions
 				{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
 				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
 		
-		#fits GH polynomials to an array of absorption lines, taking in an array of λs to fit at and a corresponding σ values for each absorption line. This returns a list of fitted lines (each has the num_gh_orders-ordered GH fit) and a list of losses for each fit, evaluating the fit.
-		#This is the currently used and final implementation of our parallel fitting algorithm.
+		"""
+			This function fits GH polynomials to Blaze-corrected NEID data, taking in the vector of NEID wavelengths λs, NEID variances σs, and NEID observed fluxes flux.
+			It takes in a vector of wavelengths λ_lines to "find" in NEID data. For each wavelength λ in λ_lines, this function tries fitting a GH polynomial to every wavelength in a window centered on λ.
+			After fitting to a certain λ, this function calculates the loss of this fit. Once it has fitted to every wavelength in the window centered on λ and has a loss evaluated for each fit, the script 
+			takes the wavelength in this window with the lowest loss evaluation. Note that this lowest-loss wavelength may not necessarily be the passed in λ (so this script can find shifts in lines from 
+			predicted values). This function then appends this best fit wavelength to a vector of best-fit wavelengths and appends the corresponding loss to a vector of best-fit losses. Once all lines in λ_lines
+			have been fitted to, this function returns all the fitted lines in the form of a SpectrumModel and the list of best-fit losses. 
+			This function parallelizes the above in two ways: distribute over each wavelength in λ_lines, and parallelize over multiple threads (using floops) in calculating loss over the loss window.
+			
+			
+			parameters: λ_lines-a vector of wavelengths (type Number) which this function needs to find in NEID data, λ-the list of wavelengths at which NEID observes, flux-the list of fluxes NEID observed, 
+			var-the variance of each observation NEID made, 
+			
+			returns: SpectrumModel of fitted lines, fitted_losses: list of best-fit fitted losses
+			
+		"""
+		
 		
 		
 		@assert size(λ) == size(flux) == size(var)
@@ -472,75 +494,24 @@ module SupportFunctions
 		
 	end;
 
-	#=
-	function fit_lines_v0_parallel_old(λ_lines::V1, λ::V3, flux::V4, var::V5, T::Type = promote_type(T1,T3,T4,T5); order::Integer ) where
-				{ T1<:Number, T3<:Number, T4<:Number, T5<:Number,
-				  V1<:AbstractVector{T1}, V3<:AbstractVector{T3}, V4<:AbstractVector{T4}, V5<:AbstractVector{T5}  } 
-		
-		@assert size(λ) == size(flux) == size(var)
-		n_pix = length(λ)
-		n_lines = length(λ_lines)
-		n = length(λ)
-		@assert n_lines >= 1 
-		@assert 1 <= order <= 10
-		@assert n_pix > 1 + order*n_lines  # number of fit parameters
-		covar = PDiagMat(var)   # diagonal covariance matrix
-		design_matrix = ones(n_pix,1)
-		
-		fitted_lines = []
-		fitted_losses = []
-		Threads.@threads for i in 1:n_lines
-			λ_line = λ_lines[i]
-			σ_line = 0.04
-			#will try fitting to every wavelength in the range λ_line-0.5*σ_line to λ_line+0.5*σ_line
-			lowest_idx = closest_index(λ, λ_line-0.25*σ_line)
-			highest_idx = closest_index(λ, λ_line+0.25*σ_line)
-			
-			losses = zeros(highest_idx-lowest_idx+1)
-			line_tries = []
-			Threads.@threads for j = lowest_idx:highest_idx
-				λ_to_fit = λ[j]
-
-				line = AbsorptionLine(λ_to_fit, σ_line,(@SVector zeros(order)) ) #create a line data-structure 
-				design_matrix = hcat(ones(n),		gauss_hermite_basis(line,λ,orders=1:order)  )  	# fit to the line	
-				Xt_inv_covar_X = design_matrix' * (covar \ design_matrix) 
-				X_inv_covar_y =   design_matrix' * (covar \ flux ) 
-				coeff_hat = (Xt_inv_covar_X \ X_inv_covar_y)
-				line = AbsorptionLine(λ_to_fit, σ_line, coeff_hat[2:end] )
-				
-				push!(line_tries, line)
-				#line_tries.append(line)
-				#calculating loss for this fit
-				lowest_loss_idx = closest_index(λ, λ_line-2.5*σ_line)
-				highest_loss_idx = closest_index(λ, λ_line+2.5*σ_line)
-				loss = 0.0
-				Threads.@threads for k = lowest_loss_idx:highest_loss_idx
-					loss+=abs(flux[k]-line.(λ[k]))
-				end
-				losses[j-lowest_idx+1] = loss
-			end
-			
-			#find fit with lowest loss
-			best_fit_loss, best_fit_idx = findmin(losses)
-			best_fit_λ = λ[best_fit_idx]
-			best_fit_line = line_tries[best_fit_idx]
-			
-			push!(fitted_lines, best_fit_line)
-			push!(fitted_losses, best_fit_loss)
-		end
-		return SpectrumModel(1,fitted_lines), fitted_losses
-		
-	end;
-	=#
-
 	#Testing 
 
 	function test_fit_perfect(artificial_line::AbsorptionLine, s_or_p::Integer)
 		
-		#This function compares serial to parallel implementation results for the perfect lines. In practice, the main script calls this function twice:
-		#once to get the fits from serial and once to get the fits from parallel. This function essentially creates the perfect lines, sends them to the serial or parallel fitting function above, and spits back out the line.
+		"""
+		This function compares serial to parallel implementation results for the perfect lines. When this function is called, an artificially line at some arbitrarily 
+		predefined wavelength with randomized GH coefficients is passed in as an AbsorptionLine artificial_line. This function finds the GH fluxes of this artificial line 
+		and fits to it using either the serial or the parallel implementation. In practice, the main script calls this function twice for each artificial_line created:
+		once to get the fits from serial and once to get the fits from parallel.
 		
-		#s_or_p = 0 if it should be a serial test and s_or_p = 1 if a parallel test
+		NOTE: s_or_p = 0 if it should be a serial test and s_or_p = 1 if a parallel test
+		
+		parameters: artificial_line-an AbsorptionLine of the artificially created line by the testing script, s_or_p: an integer equal to either 0 (to tell this script to use serial implementation) or 1 (to tell this script to use the parallel implementation)
+		returns: local_λ-the vector of wavelengths over which the fitted line is defined, hh-the vector of fluxes found by the fitted line, fitted0-the output from the fitting functions (the SpectrumModel and list of losses of the fit)
+		"""
+		
+		
+		
 		@assert s_or_p == 0 || s_or_p == 1
 		#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
 		
@@ -605,9 +576,23 @@ module SupportFunctions
 
 	function test_fit_delta(wavelength::T1) where{T1<:Number}
 				  
-		#This function is the "terrible" counterpart to the above function. It creates the "terrible" lines (essentially a box-shaped absorption line) at a given wavelength with randomized width and center. Then it fits to that using serial and parallel implementations from above. 
-		#Note that this function was written slightly differently from the above version in that this function is only called once by the main script. When called once, this function does both serial and parallel fitting in one go and returns the results. 
-		#We hope this slight difference of implementation of the test fit functions does not confuse the end user too much.
+				  
+		"""
+		This function compares serial to parallel implementation results for the "terrible" lines. It creates the "terrible" lines (essentially a box-shaped absorption line) 
+		at a given wavelength with randomized width and center. This function finds the GH fluxes of this artificial line and fits to it using BOTH the serial or the 
+		parallel implementation. It then returns the outcome of the fit from serial and from parallel implementations.
+		
+		Note that this function was written slightly differently from the above version in that this function is only called once by the main script. When called once, 
+		this function does both serial and parallel fitting in one go and returns the results. We hope this slight difference of implementation of the test fit functions 
+		does not confuse the end user too much.
+		
+		
+		parameters: artificial_line-an AbsorptionLine of the artificially created line by the testing script, s_or_p: an integer equal to either 0 (to tell this script to use serial implementation) or 1 (to tell this script to use the parallel implementation)
+		returns: local_λ-the vector of wavelengths over which the fitted line is defined, hh-the vector of fluxes found by the fitted line, fitted_serial-the output from the fitting functions in Serial (the SpectrumModel and list of losses of the fit), fitted_parallel-the output from the fitting functions in Serial (the SpectrumModel and list of losses of the fit)
+		"""
+		#This function is the "terrible" counterpart to the above function.  Then it fits to that using serial and parallel implementations from above. 
+		#
+		#
 		#will return \lambda_local, artificial fluxes, fitted0 (this has the lines that were fitted and the loss)
 		
 		
