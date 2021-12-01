@@ -103,7 +103,7 @@ module SupportFunctions
 			"""
 				Absorption line struct, holds the wavelength, variance, and list of GH coefficients corresponding to the Absorption Line. 
 				
-				parameters: \lambda-float64 that holds the central wavelength of the absorption line, \sigma-float64 that holds the variance of the absorption line, gh_coeff-vector that holds 4th order GH polynomial fit coefficients
+				parameters: \\lambda-float64 that holds the central wavelength of the absorption line, \\sigma-float64 that holds the variance of the absorption line, gh_coeff-vector that holds 4th order GH polynomial fit coefficients
 			"""
 			λ::Float64
 			σ::Float64
@@ -115,8 +115,8 @@ module SupportFunctions
 				This function returns the value of an Absorption line evaluated at a given wavelength. In practice, it is simply a 4-th order GH polynomial being evaluated
 				at a specific wavelength.
 				
-				parameters: \lambda-some vector of wavelengths at which the AbsorptionLine struct is evaluated.
-				returns: vector with size equal to \lambda whose values are the evaluation of normalized flux of absorption line at each wavelength in \lambda
+				parameters: \\lambda-some vector of wavelengths at which the AbsorptionLine struct is evaluated.
+				returns: vector with size equal to \\lambda whose values are the evaluation of normalized flux of absorption line at each wavelength in \\lambda
 			"""
 			
 			T = typeof(line.λ)
@@ -134,8 +134,8 @@ module SupportFunctions
 			"""
 			Just a gaussian, this is used in creating Gaussians for GH polynomials and in creating absorption lines.
 			
-			parameters: line-an absorption line, \lambda-a number
-			returns: vector holding values of gaussian centered at \lambda with wavelengths and variance given from the AbsorptionLine line
+			parameters: line-an absorption line, \\lambda-a number
+			returns: vector holding values of gaussian centered at \\lambda with wavelengths and variance given from the AbsorptionLine line
 			"""
 			exp(-((λ-line.λ)/line.σ)^2//2)
 		end
@@ -148,8 +148,8 @@ module SupportFunctions
 		"""
 		Creates a GH polynimal for the given line, fits to it, and evaluates the value of this GH polynomial at a given wavelength.
 		
-		parameters: line-an AbsorptionLine, \lambda-a number, order-a number that defines the order of the GH fit
-		returns: a vector with values of the GH polynomial that has been passed in through the AbsorptionLine line evaluted centered at wavelength \lambda passed in.
+		parameters: line-an AbsorptionLine, \\lambda-a number, order-a number that defines the order of the GH fit
+		returns: a vector with values of the GH polynomial that has been passed in through the AbsorptionLine line evaluted centered at wavelength \\lambda passed in.
 		"""
 		
 		@assert 1 <= order+1 <= length(gh_polynomials)
@@ -166,8 +166,8 @@ module SupportFunctions
 		"""
 		Creates a GH polynimal for the given line, fits to it, and evaluates the value of this GH polynomial at a given wavelength.
 		
-		parameters: line-an AbsorptionLine, \lambda-a number, order-a number that defines the order of the GH fit (takes default value of the number of GH coefficients in the absorption line if not explicitly defined)
-		returns: a vector with values of the GH polynomial that has been passed in through the AbsorptionLine line evaluted centered at wavelength \lambda passed in.
+		parameters: line-an AbsorptionLine, \\lambda-a number, order-a number that defines the order of the GH fit (takes default value of the number of GH coefficients in the absorption line if not explicitly defined)
+		returns: a vector with values of the GH polynomial that has been passed in through the AbsorptionLine line evaluted centered at wavelength \\lambda passed in.
 		"""
 	
 		T = typeof(line.λ)
@@ -194,10 +194,10 @@ module SupportFunctions
 
 	function (model::SpectrumModel)(λ)
 		"""
-			Evaluates the value of the spectrum of lines at a given \lambda
+			Evaluates the value of the spectrum of lines at a given \\lambda
 			
-			parameters: \lambda-a number-the wavelength at which the spectrum's value needs to be interpreted.
-			returns: a vector whose values are the value of each line evaluated at the passed in \lambda wavelength.
+			parameters: \\lambda-a number-the wavelength at which the spectrum's value needs to be interpreted.
+			returns: a vector whose values are the value of each line evaluated at the passed in \\lambda wavelength.
 		"""
 		result = fill(model.norm,length(λ))
 		for i in 1:length(model.lines)
@@ -218,8 +218,8 @@ module SupportFunctions
 		"""
 			This function finds the index in the array λ of the value that is closest to num_to_find
 			
-			parameters: \lambda-a vector of wavelengths to search in, num_to_find-a number that we are looking for in the vector \lambda
-			returns: i_tor the index of the value in \lambda that is closest to num_to_find
+			parameters: \\lambda-a vector of wavelengths to search in, num_to_find-a number that we are looking for in the vector \\lambda
+			returns: i_tor the index of the value in \\lambda that is closest to num_to_find
 		"""
 		
 		max_val = maximum(λ)
